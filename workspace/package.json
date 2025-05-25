@@ -1,9 +1,12 @@
 {
-  "name": "discordjs-largebot",
+  "name": "discord-singlefilebot",
   "version": "1.0.0",
+  "description": "A large-scale Discord bot using discord.js, supports moderation, reminders, games, and more in a single main.mjs file.",
   "type": "module",
   "main": "main.mjs",
-  "description": "A large-scale Discord.js bot with sqlite persistent storage and slash command UX.",
+  "scripts": {
+    "start": "node main.mjs"
+  },
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite": "^5.1.1",
@@ -13,9 +16,13 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "scripts": {
-    "start": "node main.mjs"
-  },
+  "keywords": [
+    "discord",
+    "discord.js",
+    "bot",
+    "sqlite",
+    "single-file"
+  ],
   "author": "",
   "license": "MIT"
 }

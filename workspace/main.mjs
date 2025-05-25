@@ -1091,10 +1091,11 @@ client.on('interactionCreate', async interaction => {
             { name: "Active users", value: ""+users.n, inline: true }
           )
           .setColor(0x2e89ff);
-        await interaction.reply({embeds:[embed], ephemeral:true});
+        await interaction.reply({embeds:[embed], ephemeral:false});
         return;
     }
 });
+
 
 
 let lastMessageUserCache = {};
@@ -1372,6 +1373,13 @@ const welcomeButtonRow = new ActionRowBuilder().addComponents(
 process.on("uncaughtException", err => {
     console.error("Uncaught Exception:", err);
 });
+
+// Global error handler for unhandled rejections as well (prevents crash on async errors)
+process.on("unhandledRejection", err => {
+    console.error("Unhandled Rejection:", err);
+});
+
+
 
 // Listen for admin command: update blocklist dynamically (moderation tool, slash command)
 
