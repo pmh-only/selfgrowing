@@ -1,18 +1,21 @@
 {
-  "name": "discord-singlefile-bot",
+  "name": "discord-bot-large",
   "version": "1.0.0",
   "type": "module",
-  "description": "A demonstration Discord bot using discord.js, sqlite, and file system, single main.mjs file.",
   "main": "main.mjs",
+  "description": "Large-scale Discord bot with extra features, slash commands, SQLite, and public data persistence",
   "scripts": {
     "start": "node main.mjs"
   },
-  "author": "AI Codex",
-  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6",
     "humanize-duration": "^3.29.0"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "YourName",
+  "license": "ISC"
 }
