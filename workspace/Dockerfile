@@ -7,6 +7,6 @@ COPY package.json  .
 
 RUN pnpm i
 
-COPY main.js  .
+COPY main.mjs  .
 
 ENTRYPOINT [ "node", "/app/main.mjs" ]
