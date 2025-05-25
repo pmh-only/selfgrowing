@@ -318,21 +318,25 @@ const contextCommands = [
 
 
 // --- Slash commands registration ---
-const commands = [
+    const commands = [
+        // ... previous commands ...
+        {
+            name: 'note',
+            description: 'Add/view/delete personal notes privately.',
+            options: [
+                { name: 'add', type: 1, description: 'Add a private note', options:[{name:'content',type:3,description:'Your note',required:true}]},
+                { name: 'list', type: 1, description: 'View your private notes'},
+                { name: 'delete', type: 1, description: 'Delete a note by its number', options: [{name:"number",type:4,description:"Note number from /note list",required:true}]},
+                { name: 'pin', type: 1, description: 'Pin a note by its number', options: [{name:"number",type:4,description:"Note # to pin",required:true}]},
+                { name: 'pinned', type: 1, description: 'View your pinned notes'},
+                { name: 'search', type: 1, description: 'Search your notes', options: [{name:"query",type:3,description:"Search text",required:true}]}
+            ]
+        },
+        {
+            name: 'downvotes',
+            description: 'Show the most downvoted messages in the channel!'
+        },
 
-    {
-        name: 'note',
-        description: 'Add/view/delete personal notes privately.',
-
-        options: [
-            { name: 'add', type: 1, description: 'Add a private note', options:[{name:'content',type:3,description:'Your note',required:true}]},
-            { name: 'list', type: 1, description: 'View your private notes'},
-            { name: 'delete', type: 1, description: 'Delete a note by its number', options: [{name:"number",type:4,description:"Note number from /note list",required:true}]},
-            { name: 'pin', type: 1, description: 'Pin a note by its number', options: [{name:"number",type:4,description:"Note # to pin",required:true}]},
-            { name: 'pinned', type: 1, description: 'View your pinned notes'},
-            { name: 'search', type: 1, description: 'Search your notes', options: [{name:"query",type:3,description:"Search text",required:true}]}
-        ]
-    },
 
     {
         name: "poll",
@@ -1439,43 +1443,45 @@ return;
         return;
     }
 
-    // --- SLASH: UPVOTES ---
-
-    if (interaction.isChatInputCommand() && interaction.commandName === 'upvotes') {
-        // Show the most upvoted messages in the channel (public leaderboard)
+    // --- SLASH: UPVOTES & DOWNVOTES (new public leaderboard for "Thumbs Down") ---
+    if (interaction.isChatInputCommand() && (interaction.commandName === 'upvotes' || interaction.commandName === 'downvotes')) {
+        // Unified leaderboard for thumbs up or thumbs down, more fun!
+        const isUpvotes = interaction.commandName === 'upvotes';
+        const reactionStr = isUpvotes ? "👍" : "👎";
         let votes = [];
         try {
             votes = await db.all(`
                 SELECT messageId, COUNT(*) as votes
                 FROM reactions
-                WHERE reaction='👍'
+                WHERE reaction=?
                 GROUP BY messageId
                 ORDER BY votes DESC
                 LIMIT 5
-            `);
+            `, [reactionStr]);
         } catch {}
         if (!votes || !votes.length) {
-            await interaction.reply({content:"No upvoted messages yet! Right click a message and use **Thumbs Up** to upvote."});
+            await interaction.reply({content: `No ${isUpvotes ? "upvoted" : "downvoted"} messages yet! Right click a message and use **${reactionStr === "👍" ? "Thumbs Up" : "Thumbs Down"}** to ${isUpvotes ? "upvote" : "downvote"}.`});
             return;
         }
         let embed = new EmbedBuilder()
-            .setTitle("🌟 Top Upvoted Messages")
-            .setDescription("The most 'Thumbs Up' messages in this channel.");
+            .setTitle(isUpvotes ? "🌟 Top Upvoted Messages" : "💢 Most Downvoted Messages")
+            .setDescription(isUpvotes ? "The most 'Thumbs Up' messages in this channel." : "Ouch! The most 'Thumbs Down' messages in this channel.");
         let lines = [];
         for (let row of votes) {
             try {
                 let chan = await client.channels.fetch(CHANNEL_ID);
                 let msg = await chan.messages.fetch(row.messageId);
                 let jumplink = msg.url ? `[jump](${msg.url})` : "";
-                lines.push(`> "${msg.content.slice(0,60)}" — **${row.votes} 👍** ${jumplink}`);
+                lines.push(`> "${msg.content.slice(0,60)}" — **${row.votes} ${reactionStr}** ${jumplink}`);
             } catch {
-                lines.push(`(Message deleted) — **${row.votes} 👍**`);
+                lines.push(`(Message deleted) — **${row.votes} ${reactionStr}**`);
             }
         }
-        embed.setDescription(lines.join("\n") || "No upvoted messages found.");
+        embed.setDescription(lines.join("\n") || `No ${isUpvotes ? "upvoted" : "downvoted"} messages found.`);
         await interaction.reply({embeds:[embed]});
         return;
     }
+
 
     // --- SLASH: ROCK PAPER SCISSORS ---
 
