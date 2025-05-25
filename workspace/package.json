@@ -1,19 +1,21 @@
 {
-  "name": "discord-productivity-bot",
+  "name": "discordbot",
   "version": "1.0.0",
-  "description": "A large-scale Discord bot for a single channel with productivity and fun tools.",
   "type": "module",
+  "description": "A powerful Discord.js bot with productivity, moderation and fun features.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6",
     "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "author": "",
+  "license": "MIT"
 }

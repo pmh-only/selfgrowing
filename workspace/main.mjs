@@ -1112,6 +1112,21 @@ return;
         return;
     }
 
+    // --- SLASH: COINFLIP ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'coinflip') {
+        const result = Math.random() < 0.5 ? "Heads" : "Tails";
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                  .setTitle("🪙 Coin Flip")
+                  .setDescription(`The coin landed on **${result}**!`)
+                  .setColor(result === "Heads" ? 0xfbff00 : 0x525252)
+            ]
+        });
+        return;
+    }
+
+
 
 
 
