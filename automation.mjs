@@ -120,4 +120,4 @@ const commit_response = await client.responses.create({
   ]
 })
 
-fs.writeFileSync(process.env.GITHUB_OUTPUT, 'COMMIT_MESSAGE='+commit_response.output_text)
+fs.appendFileSync(process.env.GITHUB_OUTPUT, 'COMMIT_MESSAGE='+commit_response.output_text+'\n')
