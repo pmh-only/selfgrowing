@@ -452,6 +452,11 @@ const commands = [
         ]
     },
     {
+        name: "rollhist",
+        description: "Show your recent dice roll history"
+    },
+
+    {
         name: "coinflip",
         description: "Flip a coin for heads or tails!"
     },
@@ -1114,6 +1119,32 @@ return;
                 else if (rolls[0]===1)
                     desc += "\n💀 NAT 1! Oof.";
             }
+
+            // Additional feature: Save this roll to per-user roll history (in /data/roll_history.json)
+            let pastRolls = [];
+            try {
+                pastRolls = await readJSONFile("roll_history.json", []);
+            } catch {}
+            let resultMsg = `[${rolls.join(", ")}]` + (modifier ? ` ${modifier>0?"+":""}${modifier}` : "") + ` = ${sum}`;
+            pastRolls.push({
+                userId: interaction.user.id,
+                formula: `${num}d${sides}${modifier? (modifier>0?`+${modifier}`:modifier):""}`,
+                results: rolls,
+                modifier,
+                sum,
+                at: Date.now(),
+                resultMsg
+            });
+            // Only retain 50 rolls per user for storage limits
+            let keepRolls = [];
+            let rollUserCounts = {};
+            for (let r of pastRolls.reverse()) {
+                rollUserCounts[r.userId] = (rollUserCounts[r.userId]||0)+1;
+                if (rollUserCounts[r.userId]<=50) keepRolls.push(r);
+            }
+            keepRolls = keepRolls.reverse();
+            await saveJSONFile("roll_history.json", keepRolls);
+
             await interaction.reply({embeds:[
                 new EmbedBuilder().setTitle("Dice Roll").setDescription(desc).setColor(0xffbe29)
             ]});
@@ -1124,6 +1155,7 @@ return;
         }
         return;
     }
+
 
     // --- SLASH: COINFLIP ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'coinflip') {
