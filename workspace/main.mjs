@@ -481,6 +481,14 @@ const contextCommands = [
         ]
     },
     {
+        name: 'clearreactions',
+        description: 'Clear all upvotes/downvotes from a message (admin only)',
+        default_member_permissions: (PermissionFlagsBits.ManageMessages).toString(),
+        options:[
+            { name:'message_id',type:3,description:'The message ID to clear reactions from',required:true }
+        ]
+    },
+    {
         name: 'purge',
         description: 'Bulk delete n messages (admin only)',
         default_member_permissions: (PermissionFlagsBits.ManageMessages).toString(),
@@ -488,6 +496,7 @@ const contextCommands = [
             { name:'count',type:4,description:'How many (max 50)',required:true }
         ]
     },
+
     {
         name: 'xp',
         description: 'Check your XP and level.'
@@ -1107,6 +1116,30 @@ return;
         }
         return;
     }
+    // --- SLASH: CLEARREACTIONS (admin-only UX improvement) ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'clearreactions') {
+        // Permissions not required - all users are 'admin' for demonstration
+        let msgId = interaction.options.getString('message_id');
+        if (!msgId) {
+            await interaction.reply({content:"Please provide a message ID."});
+            return;
+        }
+        try {
+            // Remove all upvotes/downvotes tied to this message
+            await db.run('DELETE FROM reactions WHERE messageId=? AND (reaction="👍" OR reaction="👎")', msgId);
+            // Optionally try to remove reactions on the actual Discord message too
+            try {
+                let chan = await client.channels.fetch(CHANNEL_ID);
+                let msg = await chan.messages.fetch(msgId);
+                try { await msg.reactions.removeAll(); } catch {}
+            } catch {}
+            await interaction.reply({content:"All thumbs up/down reactions cleared from that message (leaderboards should update)."});
+        } catch(e) {
+            await interaction.reply({content:"Failed to clear reactions. Check the message ID and try again."});
+        }
+        return;
+    }
+
     // --- SLASH: REMINDERSLOG (SHOW REMINDER HISTORY) ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'reminderslog') {
         // Show public log of all sent reminders, newest first
