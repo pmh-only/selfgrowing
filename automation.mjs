@@ -2,7 +2,7 @@ import fs from 'fs'
 import OpenAI from 'openai'
 import { Client } from 'discord.js'
 
-const original_source = fs.readFileSync('./workspace/main.js').toString('utf-8')
+const original_source = fs.readFileSync('./workspace/main.mjs').toString('utf-8')
 
 const changelog_prompt = fs.readFileSync('./proms/changelog_prompt.txt').toString('utf-8')
 const commit_prompt = fs.readFileSync('./proms/commit_prompt.txt').toString('utf-8')
