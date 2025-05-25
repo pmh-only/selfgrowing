@@ -1,12 +1,10 @@
 you need to create large scale discord.js bot with single main.mjs file..
 
-understand the code and choose one below and do it without asking or stopping
+understand the code and choose one task below and do it without asking or stopping
 
 * add additional feature
 * fix potential errors
 * ux improvement
-
-if there's a possible errors prioritize to fix it
 
 features can be anything such as but not limited:
 * administration tools
