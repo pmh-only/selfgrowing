@@ -1,14 +1,14 @@
 {
-  "name": "discord-slashbot",
-  "type": "module",
+  "name": "discord-bot-large",
   "version": "1.0.0",
-  "description": "Large scale single-file Discord.js bot with slash commands, SQLite, and public UX improvements.",
+  "type": "module",
   "main": "main.mjs",
+  "description": "Large scale Discord.js bot with public user data and persistent SQLite & file system storage",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.13.0",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"

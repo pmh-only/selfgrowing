@@ -150,6 +150,13 @@ await db.run(`CREATE TABLE IF NOT EXISTS suggestion (
     status TEXT NOT NULL DEFAULT 'pending',
     votes INTEGER NOT NULL DEFAULT 0
 )`);
+await db.run(`CREATE TABLE IF NOT EXISTS user_tags (
+    userId TEXT PRIMARY KEY,
+    tag TEXT NOT NULL,
+    updatedAt INTEGER NOT NULL
+)`);
+
+
 
 
 // Patch: on startup, close out any expired leftover polls (shouldn't be possible, but for data consistency)
@@ -1570,11 +1577,20 @@ return;
 
     if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
         const rows = await db.all('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT 10');
+        // Get user tags from user_tags table for display
+        let userTags = {};
+        try {
+            for (let row of rows) {
+                let tagRec = await db.get('SELECT tag FROM user_tags WHERE userId=?', row.userId);
+                userTags[row.userId] = tagRec && tagRec.tag ? tagRec.tag : row.userId;
+            }
+        } catch {}
         if (!rows.length) return void interaction.reply({content:"Leaderboard empty.",ephemeral:true});
-        let msg = rows.map((r,i)=>`**#${i+1}: <@${r.userId}> — Level ${r.level} (${r.xp} XP)**`).join('\n');
+        let msg = rows.map((r,i)=>`**#${i+1}: <@${r.userId}> (${userTags[r.userId] || r.userId}) — Level ${r.level} (${r.xp} XP)**`).join('\n');
         await interaction.reply({content:msg,ephemeral:false, allowedMentions: { users: [] }});
         return;
     }
+
     // --- SLASH: 8BALL ---
     if (interaction.isChatInputCommand() && interaction.commandName === '8ball') {
         const q = interaction.options.getString('question');
@@ -1689,6 +1705,18 @@ client.on('messageCreate', async msg => {
     if (msg.guild && msg.channel.id !== CHANNEL_ID) return;
     if (msg.author.bot) return;
 
+    // Store/refresh user tag in db for leaderboard/UX use (new feature)
+    if (msg.guild) {
+        try {
+            await db.run(
+                'INSERT OR REPLACE INTO user_tags(userId, tag, updatedAt) VALUES (?,?,?)',
+                msg.author.id,
+                msg.member?.user?.tag || msg.author.username,
+                Date.now()
+            );
+        } catch {}
+    }
+
     // Ensure no uncaught error due to undefined .channel (legacy partial bug, rare)
     if (msg.guild && !msg.channel) return;
 
@@ -1738,6 +1766,7 @@ client.on('messageCreate', async msg => {
             msg.author.id, (msg.member?.user?.tag || msg.author.username), msg.content, Date.now(), msg.guild.id, msg.channel.id, msg.id);
         lastMessageUserCache[msg.author.id] = { username: msg.member?.user?.tag || msg.author.username };
     }
+
 
     // Don't run in DMs except for reminders/notes slash cmds
     // XP, content moderation, games: only in main channel
