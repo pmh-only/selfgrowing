@@ -119,9 +119,18 @@ await db.run(`CREATE TABLE IF NOT EXISTS pinned_notes (
     noteId INTEGER NOT NULL,
     UNIQUE(ownerId, noteId)
 )`);
+await db.run(`CREATE TABLE IF NOT EXISTS timers (
+    id INTEGER PRIMARY KEY,
+    userId TEXT NOT NULL,
+    name TEXT NOT NULL,
+    setAt INTEGER NOT NULL,
+    duration INTEGER NOT NULL,
+    running INTEGER NOT NULL DEFAULT 1
+)`);
 // Pinning system for notes
 
 await db.run(`CREATE TABLE IF NOT EXISTS reminders (
+
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -183,9 +192,11 @@ const commands = [
             { name: 'list', type: 1, description: 'View your private notes'},
             { name: 'delete', type: 1, description: 'Delete a note by its number', options: [{name:"number",type:4,description:"Note number from /note list",required:true}]},
             { name: 'pin', type: 1, description: 'Pin a note by its number', options: [{name:"number",type:4,description:"Note # to pin",required:true}]},
-            { name: 'pinned', type: 1, description: 'View your pinned notes'}
+            { name: 'pinned', type: 1, description: 'View your pinned notes'},
+            { name: 'search', type: 1, description: 'Search your notes', options: [{name:"query",type:3,description:"Search text",required:true}]}
         ]
     },
+
     {
         name: "poll",
         description: "Create a quick poll for this channel (max 5 options)",
@@ -233,6 +244,19 @@ const commands = [
           { name:'time',type:3,description:'When? (e.g. 10m, 2h, 1d)',required:true }
         ]
     },
+    {
+        name: "timer",
+        description: "Start a countdown timer (DM only).",
+        options: [
+          { name:'name',type:3,description:'Short timer name',required:true },
+          { name:'duration',type:3,description:'How long (e.g. 2m, 1h etc)',required:true }
+        ]
+    },
+    {
+        name: "timers",
+        description: "List your running timers (DM only)."
+    },
+
     {
         name: 'warn',
         description: 'Warn a user (no kick/ban, admin only)',
@@ -521,11 +545,60 @@ client.on('interactionCreate', async interaction => {
                 .setDescription(notes.map((n,i)=>`**[${i+1}]** ${n.note} _(at <t:${Math.floor(n.timestamp/1000)}:f>)_`).join("\n"))
                 .setColor(0xffae52);
             await interaction.reply({embeds:[embed], ephemeral:true});
+        } else if (interaction.options.getSubcommand() === "search") {
+            const query = interaction.options.getString("query").toLowerCase();
+            const rows = await db.all('SELECT note, timestamp FROM notes WHERE userId=? ORDER BY id DESC LIMIT 50', interaction.user.id);
+            const matches = rows.filter(r => r.note.toLowerCase().includes(query));
+            if (!matches.length) return void interaction.reply({content:`No matching notes found for "${query}".`,ephemeral:true});
+            const embed = new EmbedBuilder()
+                .setTitle(`🔎 Notes matching "${query}"`)
+                .setDescription(matches.slice(0,10).map((n,i)=>`**[${i+1}]** ${n.note} _(at <t:${Math.floor(n.timestamp/1000)}:f>)_`).join("\n"))
+                .setColor(0x4a90e2);
+            await interaction.reply({embeds:[embed], ephemeral: true});
         }
         return;
     }
 
 
+
+
+    // --- SLASH: TIMER ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'timer') {
+        // Only allow in DM
+        if (interaction.guild) {
+            await interaction.reply({content:"Use /timer in DM only!", ephemeral:true}); return;
+        }
+        const name = interaction.options.getString('name').substring(0,40);
+        const dur = parseTime(interaction.options.getString('duration'));
+        if (!dur || isNaN(dur) || dur < 5000) return void interaction.reply({content:"Invalid duration. Min: 5 seconds.", ephemeral:true});
+        if (dur > 5*60*60*1000) return void interaction.reply({content:"Timer max is 5 hours.", ephemeral:true});
+        await db.run('INSERT INTO timers(userId, name, setAt, duration, running) VALUES (?,?,?,?,1)', interaction.user.id, name, Date.now(), dur);
+        setTimeout(async()=>{
+          const last = await db.get('SELECT * FROM timers WHERE userId=? AND name=? AND running=1', interaction.user.id, name);
+          if (!last) return;
+          await db.run('UPDATE timers SET running=0 WHERE id=?', last.id);
+          try { await interaction.user.send(`⏰ [TIMER "${last.name}" DONE] Your ${humanizeMs(last.duration)} timer finished!`);} catch{}
+        }, dur);
+        await interaction.reply({content:`⏳ Timer **"${name}"** started for ${humanizeMs(dur)}! I'll DM when done.`, ephemeral:true});
+        return;
+    }
+    if (interaction.isChatInputCommand() && interaction.commandName === "timers") {
+        if (interaction.guild) {
+            await interaction.reply({content:"Use in DM only",ephemeral:true}); return;
+        }
+        const rows = await db.all('SELECT name, setAt, duration, running FROM timers WHERE userId=? ORDER BY setAt DESC LIMIT 10', interaction.user.id);
+        if (!rows.length) return void interaction.reply({content:"No running or completed timers found.", ephemeral:true});
+        let desc = rows.map(r => {
+            if (r.running) {
+                let left = humanizeMs(r.setAt + r.duration - Date.now());
+                return `⏳ **${r.name}** — ends in ${left}`;
+            } else {
+                return `✅ **${r.name}** — finished`;
+            }
+        }).join('\n');
+        await interaction.reply({embeds:[new EmbedBuilder().setTitle("Your timers").setDescription(desc).setColor(0xd1882a)], ephemeral:true});
+        return;
+    }
     // --- SLASH: REMIND ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'remind') {
         const content = interaction.options.getString('content').substring(0,200);
@@ -538,6 +611,8 @@ client.on('interactionCreate', async interaction => {
         scheduleReminders(client);
         return;
     }
+
+
 
     // --- SLASH: WARN --- 
     if (interaction.isChatInputCommand() && interaction.commandName === 'warn') {
@@ -649,6 +724,19 @@ client.on('messageCreate', async msg => {
     if (msg.guild && msg.channel.id !== CHANNEL_ID) return;
     if (msg.author.bot) return;
 
+    // AUTO-RESPOND FRIEND MODE (fun UX): 
+    if (msg.guild && msg.mentions.has(client.user) && msg.content.length < 80) {
+        let responses = [
+            "Hey there! Want help? Try `/` for commands.",
+            "👋 How can I help you today?",
+            "Use `/note` to keep your thoughts, `/remind` for reminders!",
+            "Need fun? `/8ball` awaits your questions.",
+            "I'm always here to assist. Type `/` to see more."
+        ];
+        await msg.reply({content: responses[Math.floor(Math.random()*responses.length)], ephemeral: true});
+    }
+
+
     // --- Log all messages for moderation/stats ---
     if (msg.guild) {
         await db.run('INSERT INTO message_logs(userId, username, content, createdAt) VALUES (?,?,?,?)',
@@ -743,11 +831,14 @@ client.on('messageCreate', async msg => {
     }
 
     if (msg.content.startsWith('/help')) {
-        await msg.reply(`Available commands:\n- /note\n- /remind\n- /note pin\n- /poll\n- /quotes\n\n⭐ Use /note pin to pin your favorite notes!`);
+        await msg.reply(`Available commands:\n- /note\n- /note search\n- /remind\n- /note pin\n- /poll\n- /timer\n- /timers\n- /quotes\n\n⭐ Use /note pin to pin your favorite notes!`);
+    } else if (/timer/i.test(msg.content)) {
+        await msg.reply("Try `/timer` to set a DM countdown for yourself, or `/timers` to view your timers!");
     } else {
-        await msg.reply(`Hi! Please use slash commands such as /note, /remind, /poll, /avatar, /quotes and more! (Type \`/\` to see all options.)`);
+        await msg.reply(`Hi! Please use slash commands such as /note, /note search, /remind, /poll, /timer and more. (Type \`/\` to see all options.)`);
     }
 });
+
 
 
 
