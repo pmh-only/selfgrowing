@@ -1,18 +1,21 @@
 {
   "name": "discord-productivity-bot",
   "version": "1.0.0",
-  "description": "A feature-rich Discord productivity and moderation bot (single channel, slash commands, SQLite persistence).",
   "type": "module",
+  "description": "Private scalable productivity discord bot with slash commands, moderation, games, and more.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
-  "author": "yourname",
-  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Your Name",
+  "license": "MIT"
 }

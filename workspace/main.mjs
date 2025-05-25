@@ -176,15 +176,23 @@ await client.login(TOKEN);
 
 /*
 New UX/features added in this SEARCH/REPLACE update:
-- /todo: private to-do list manager (submenu add, complete, remove, list)
-- Cooldown on /purge for safety, visual confirm button before delete.
-- /quote now allows tagging a category with a modal, /quotes can filter by it.
-- Poll: allow user to retract vote
-- /dmuser (admin only): DM a user with a message (helpful for reaching out privately)
-- Properly migrate pinned_notes table from pinned_notes(ownerId,noteId) to todo_entries(userId, content, done, ts), if needed.
-- Show a welcome embed in DM with a persistent "Get Started" button for onboarding.
-- /xp: level-up history with timestamps available.
+// UX/features added in this SEARCH/REPLACE update:
+// - /todo: private to-do list manager (submenu add, complete, remove, list)
+// - Cooldown on /purge for safety, visual confirm button before delete.
+// - /quote now allows tagging a category with a modal, /quotes can filter by it.
+// - Poll: allow user to retract vote
+// - /dmuser (admin only): DM a user with a message (helpful for reaching out privately)
+// - Properly migrate pinned_notes table from pinned_notes(ownerId,noteId) to todo_entries(userId, content, done, ts), if needed.
+// - Show a welcome embed in DM with a persistent "Get Started" button for onboarding.
+// - /xp: level-up history with timestamps available.
+// 
+// ### Additional Feature: Fun Dice Game!
+// - /roll: Roll standard dice (e.g. /roll 1d6, /roll 2d12+3 etc), with math parsing and result explanation.
+// 
+// ## (End of changelog)
+
 */
+
 
 import path from 'path';
 
@@ -359,7 +367,6 @@ const commands = [
             { name:'message',type:3,description:'Message to stick (max 400 chars, use "" for none/remove)',required:true }
         ]
     },
-
     {
         name: 'snipe',
         description: "Show the last deleted message in this channel (moderation tool)"
@@ -367,8 +374,16 @@ const commands = [
     {
         name: 'stats',
         description: "Show bot usage stats & message counts"
+    },
+    {
+        name: "roll",
+        description: "Roll some dice (e.g. 1d6, 2d20+5, etc)",
+        options: [
+            { name: "formula", type: 3, description: "Dice formula (e.g. 1d6+2)", required: false }
+        ]
     }
 ];
+
 
 
 const rest = new REST({version: '10'}).setToken(TOKEN);
@@ -859,6 +874,44 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
+    // --- SLASH: ROLL ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "roll") {
+        let formula = interaction.options?.getString?.("formula") || "1d6";
+        // '2d6+4', 'd20-1', '3d12', etc.
+        // Parse: <num>d<sides>[+/-mod]
+        let m = formula.replace(/\s+/g,"").toLowerCase().match(/^(\d*)d(\d+)((?:[+-]\d+)*)$/);
+        if (!m) return void interaction.reply({content:"Invalid dice formula. Use e.g. 1d20, 2d6+3 (max 100 dice, sides 2-1000).", ephemeral:true});
+
+        let num = parseInt(m[1] || "1",10);
+        let sides = parseInt(m[2],10);
+        let modifier = 0;
+        let modmatches = (m[3]||"").match(/[+-]\d+/g);
+        if (modmatches) for (let mod of modmatches) modifier += parseInt(mod,10);
+
+        if (isNaN(num) || num<1 || num>100 || isNaN(sides) || sides<2 || sides>1000)
+            return void interaction.reply({content:"Dice count must be 1-100; sides 2-1000.", ephemeral:true});
+        
+        // Roll!
+        let rolls = [];
+        for (let i=0;i<num;i++) rolls.push(Math.floor(Math.random()*sides)+1);
+        let sum = rolls.reduce((a,b)=>a+b,0) + modifier;
+        let desc = `🎲 Rolling: \`${num}d${sides}${modifier? (modifier>0?`+${modifier}`:modifier):""}\`\nResults: [${rolls.join(", ")}]`
+            + (modifier ? ` ${modifier>0?"+":""}${modifier}` : "") + `\nTotal: **${sum}**`;
+        
+        // Flavor message for nat 1 or max, d20
+        if (sides===20 && num===1) {
+            if (rolls[0]===20)
+                desc += "\n🌟 **NAT 20!** Critical success!";
+            else if (rolls[0]===1)
+                desc += "\n💀 NAT 1! Oof.";
+        }
+        await interaction.reply({embeds:[
+            new EmbedBuilder().setTitle("Dice Roll").setDescription(desc).setColor(0xffbe29)
+        ]});
+        return;
+    }
+
 
 
     // --- SLASH: LEADERBOARD ---
