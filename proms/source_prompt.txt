@@ -32,11 +32,13 @@ always remember following restrictions:
 * bot token is stored in DISCORD_TOKEN environment variable
 * guild id is stored in DISCORD_GUILD_ID environment variable
 * this bot can be used at only one channel which stored in DISCORD_CHANNEL_ID. prevent everything includes DM messaging
+* move out dm features to guild channel
 * you can use slash command. message command, user commands. register interactions on startup.
 * you can use external data and npm dependencies. i will ask you about package.json later
 * you can use every intent and partials.
 * you need to prevent application crashing. if you need to catch error, use try/catch block and uncaughtException handler
-
+* do not use ephemeral messages. use normal messages
+* make all user data to public. do not use private data
 
 output a string of SEARCH/REPLACE block(s) which will be applied to the given file.
 Your SEARCH/REPLACE blocks string must be formatted as follows:
