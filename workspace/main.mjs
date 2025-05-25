@@ -187,12 +187,22 @@ async function scheduleReminders(client) {
     reminderTimer = setTimeout(async () => {
         try {
             const user = await client.users.fetch(next.userId);
-            await user.send(`[⏰ Reminder] ${next.content}`);
+            // Prevent DM reminders outside allowed channel. UX: fallback: try ephemeral message if DM fails.
+            try {
+                await user.send(`[⏰ Reminder] ${next.content}`);
+            } catch (e) {
+                // fallback: send ephemeral in main channel if possible
+                const chan = client.channels.cache.get(CHANNEL_ID);
+                if (chan?.isTextBased && chan?.send) {
+                    await chan.send(`<@${next.userId}>: [⏰ Reminder] ${next.content}`);
+                }
+            }
             await db.run("DELETE FROM reminders WHERE id = ?", next.id);
-        } catch{}
+        } catch(e){}
         scheduleReminders(client);
     }, wait);
 }
+
 
 // Intents and partials needed for DMs and single channel operation
 const client = new Client({
@@ -545,12 +555,18 @@ client.on('interactionCreate', async interaction => {
             .setTitle("📊 "+title)
             .setDescription(opts.map((o,i)=>`${pollEmojis[i]} ${o}`).join("\n"))
             .setFooter({ text: `Poll ends in ${humanizeMs(dur)}` })
-            .setColor(0x0ebbaf);
+            .setColor(0x0ebbaf)
+            .setTimestamp(Date.now() + dur);
+
         const row = new ActionRowBuilder().addComponents(
             opts.map((_,i)=>
                 new ButtonBuilder().setCustomId(`vote_${i}`).setLabel(String.fromCharCode(65+i)).setStyle(ButtonStyle.Primary)
             ).concat(new ButtonBuilder().setCustomId('vote_retract').setLabel('Retract Vote').setStyle(ButtonStyle.Secondary))
         );
+        // Safety: store poll options for fast access so "vote" doesn't fail if options parse bug
+        client._activePolls = client._activePolls || {};
+        client._activePolls[cmsg.id] = { opts, end: Date.now()+dur };
+
         const cmsg = await interaction.reply({ embeds: [embed], components:[row], fetchReply:true });
         await db.run(`
             INSERT INTO poll(title, options, creatorId, channelId, messageId, votes, expiresAt)
@@ -559,11 +575,14 @@ client.on('interactionCreate', async interaction => {
         setTimeout(async ()=>{
             let p = await db.get('SELECT * FROM poll WHERE messageId=?', cmsg.id);
             if (!p) return;
+            // Remove from in-memory _activePolls
+            if (client._activePolls) delete client._activePolls[cmsg.id];
             try {
                 await finishPoll(p, interaction.channel);
             } catch {}
         }, dur);
         return;
+
     }
 
 
@@ -1198,6 +1217,7 @@ client.on('messageCreate', async msg => {
 });
 
 
+// --- POLL BUTTON HANDLER (button voting, retract vote) ---
 client.on('interactionCreate', async interaction => {
     // UX: Save code as note (from message button)
     if (interaction.isButton() && interaction.customId.startsWith("save_code_note_")) {
@@ -1212,6 +1232,50 @@ client.on('interactionCreate', async interaction => {
             await interaction.reply({content:"✅ Code saved as private note (in `/note list` in DM).", ephemeral:true});
         } catch(e) {
             await interaction.reply({content:"Could not save code.", ephemeral:true});
+        }
+        return;
+    }
+    // POLL VOTING BUTTON HANDLING (fix: check for expired/missing poll, UX improvement)
+    if (interaction.isButton() && (/^vote_(\d)$/).test(interaction.customId) || interaction.customId==="vote_retract") {
+        const mid = interaction.message?.id;
+        // Defensive: Ensure poll not expired/deleted from DB
+        let poll = await db.get('SELECT * FROM poll WHERE messageId=?', mid);
+        if (!poll) {
+            try { await interaction.reply({content:"Poll expired or closed!",ephemeral:true}); } catch {}
+            return;
+        }
+        let opts;
+        try { opts = JSON.parse(poll.options); }
+        catch { opts = (client._activePolls && client._activePolls[mid]) ? client._activePolls[mid].opts : ["OptionA","OptionB"]; }
+        let votes = {};
+        try { votes = JSON.parse(poll.votes||'{}'); } catch { votes = {}; }
+        let changed = false;
+        if (interaction.customId.startsWith("vote_")) {
+            let idx = parseInt(interaction.customId.split("_")[1],10);
+            if (idx<0 || idx>=opts.length) return void interaction.reply({content:"Invalid option!",ephemeral:true});
+            if (votes[interaction.user.id]!==idx) { votes[interaction.user.id] = idx; changed=true; }
+        } else if (interaction.customId==="vote_retract") {
+            if (votes[interaction.user.id]!==undefined) { delete votes[interaction.user.id]; changed = true; }
+        }
+        if (!changed) return void interaction.reply({content:"No change to your vote!",ephemeral:true});
+        await db.run('UPDATE poll SET votes=? WHERE id=?', JSON.stringify(votes), poll.id);
+        // Dynamic update: show new poll results!
+        let counts = opts.map((_,i)=>Object.values(votes).filter(v=>v==i).length);
+        let desc = opts.map((opt,i)=>`${pollEmojis[i]} **${opt}** — ${counts[i]} vote${counts[i]!=1?'s':''}`).join("\n");
+        let total = counts.reduce((a,b)=>a+b,0);
+        if (total===0) desc+="\n*No votes yet*";
+        try {
+            await interaction.update({
+                embeds:[
+                    new EmbedBuilder()
+                        .setTitle("📊 "+poll.title)
+                        .setDescription(desc)
+                        .setColor(0x0ebbaf)
+                        .setFooter({ text: `Poll ends at <t:${Math.floor(poll.expiresAt/1000)}:f>`})
+                ]
+            });
+        } catch (e) {
+            try { await interaction.reply({content:"Vote registered.",ephemeral:true}); } catch {}
         }
         return;
     }
@@ -1236,6 +1300,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 });
+
 
 
 
