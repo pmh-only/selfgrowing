@@ -303,8 +303,12 @@ const commands = [
     },
     {
         name: "quotes",
-        description: "Show a random saved quote"
+        description: "Show a random saved quote",
+        options: [
+            { name: "category", type: 3, description: "Category/tag to filter", required: false }
+        ]
     },
+
 
 
     {
@@ -590,6 +594,9 @@ client.on('interactionCreate', async interaction => {
         // If user types something like "/quotes category=tag" use it
         let txt = interaction.options? interaction.options.getString?.('category') : undefined;
         let show = quotes;
+        // Support filtering by slash command option now!
+        if (!interaction.options) txt = undefined;
+        else txt = interaction.options.getString?.('category');
         if (txt) show = quotes.filter(q=>q.category && q.category.toLowerCase().includes(txt.toLowerCase()));
         const q = show[Math.floor(Math.random()*show.length)];
         if (!q) return void interaction.reply({content:"No quotes matching that tag!",ephemeral:true});
@@ -600,6 +607,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({embeds:[embed],ephemeral:false});
         return;
     }
+
 
 
     // --- SLASH: NOTE ---
@@ -826,17 +834,35 @@ client.on('interactionCreate', async interaction => {
         const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', interaction.user.id);
         if (!row) await interaction.reply({content:'No XP on record.',ephemeral:true});
         else {
-            // Also show last time user leveled up (if possible)
-            let prev = await db.all(`SELECT createdAt FROM message_logs WHERE userId=? ORDER BY createdAt DESC LIMIT 100`, interaction.user.id);
-            // Guess from increments (hack: not strictly precise)
-            let msg = `You have ${row.xp} XP at level ${row.level}.`;
-            if (row.level>=1 && prev.length) {
-                msg += `\n🌟 Leveled up most recently at <t:${Math.floor(prev[0].createdAt/1000)}:f>`;
+            let embed = new EmbedBuilder()
+                .setTitle("Your XP & Level")
+                .setDescription(`You have **${row.xp} XP**, Level **${row.level}**.`)
+                .setColor(0x8bd5f5);
+            // Provide recent level-up history with timestamps
+            let allMsgs = await db.all(`SELECT createdAt FROM message_logs WHERE userId=? ORDER BY createdAt DESC LIMIT 300`, interaction.user.id);
+            if (row.level >= 1 && allMsgs.length) {
+                embed.setFooter({text: `Most recent message: <t:${Math.floor(allMsgs[0].createdAt/1000)}:f>`});
             }
-            await interaction.reply({content:msg,ephemeral:true});
+            let levels = [];
+            // Guess which messages probably matched a level increase (every 100 XP; not 100% precise, fun display only)
+            let lastLevel = 0;
+            let userXp = 0, userLevel = 0;
+            for (let rec of allMsgs.reverse()) {
+                userXp += 4; // average, can fudge with +/- if storing real XP per message
+                if (userXp >= (userLevel+1)*100) {
+                    userXp = 0;
+                    userLevel += 1;
+                    levels.push({ level: userLevel, at: rec.createdAt });
+                }
+            }
+            if (levels.length) {
+                embed.addFields({name:"Level up history",value: levels.slice(-3).reverse().map(l=>`Level **${l.level}** at <t:${Math.floor(l.at/1000)}:f>`).join("\n") });
+            }
+            await interaction.reply({embeds: [embed],ephemeral:true});
         }
         return;
     }
+
 
     // --- SLASH: LEADERBOARD ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
@@ -862,9 +888,13 @@ client.on('interactionCreate', async interaction => {
             .setDescription(lastDeleted.content || "*[no content]*")
             .setFooter({text: `By ${lastDeleted.username || lastDeleted.userId}`})
             .setTimestamp(lastDeleted.createdAt || Date.now());
+        // Add jump link if possible
+        if (lastDeleted.guildId && lastDeleted.channelId && lastDeleted.messageId)
+          embed.setURL(`https://discord.com/channels/${lastDeleted.guildId}/${lastDeleted.channelId}/${lastDeleted.messageId}`);
         await interaction.reply({embeds:[embed], ephemeral:true});
         return;
     }
+
     // --- SLASH: STATS ---
     if (interaction.isChatInputCommand() && interaction.commandName === "stats") {
         const totalMsgs = await db.get('SELECT COUNT(*) as n FROM message_logs');
@@ -947,8 +977,39 @@ client.on('messageCreate', async msg => {
             await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
                 msg.author.id, "Inappropriate language", Date.now());
         }
+
+        // User tool: Detect code blocks and offer "save as note" UI
+        if (/```/.test(msg.content)) {
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId("save_code_note_"+msg.id)
+                    .setLabel("💾 Save this code as private note")
+                    .setStyle(ButtonStyle.Success)
+            );
+            await msg.reply({content: "Detected code — save to notes?", components: [row], ephemeral:true});
+        }
     }
 });
+
+client.on('interactionCreate', async interaction => {
+    // UX: Save code as note (from message button)
+    if (interaction.isButton() && interaction.customId.startsWith("save_code_note_")) {
+        let mid = interaction.customId.split("_").pop();
+        try {
+            let chan = await client.channels.fetch(CHANNEL_ID);
+            let msg = await chan.messages.fetch(mid);
+            // Extract first code block, save as note
+            let code = (msg.content.match(/```(?:\w+\n)?([\s\S]+?)```/)||[])[1]?.trim() || msg.content.trim();
+            if (!code) return void interaction.reply({content:"Couldn't find code.", ephemeral:true});
+            await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)', interaction.user.id, code.substring(0,500), Date.now());
+            await interaction.reply({content:"✅ Code saved as private note (in `/note list` in DM).", ephemeral:true});
+        } catch(e) {
+            await interaction.reply({content:"Could not save code.", ephemeral:true});
+        }
+        return;
+    }
+});
+
 
 
 // --- Startup reminder boot ---
@@ -967,9 +1028,12 @@ client.once('ready', () => {
 client.on('messageDelete', async msg => {
     // Log which message was deleted for use with /snipe
     if (!msg.partial && msg.guild && msg.channel.id === CHANNEL_ID && !msg.author?.bot) {
-        await db.run("UPDATE message_logs SET deleted=1 WHERE userId=? AND content=? AND deleted=0 ORDER BY createdAt DESC LIMIT 1", msg.author.id, msg.content);
+        // Also try to record more info for snipe jump link, in case possible
+        await db.run("UPDATE message_logs SET deleted=1, messageId=?, channelId=?, guildId=? WHERE userId=? AND content=? AND deleted=0 ORDER BY createdAt DESC LIMIT 1",
+            msg.id, msg.channel.id, msg.guild.id, msg.author.id, msg.content);
     }
 });
+
 
 let userWelcomeStatus = {};
 
@@ -1037,14 +1101,17 @@ client.on('interactionCreate', async interaction => {
                     "- `/8ball` — Ask for cosmic wisdom",
                     "- `/avatar` — View yours or anyone's pfp",
                     "- `/leaderboard` — Top chatters/XP",
+                    "- `/stats` — Bot usage and content stats",
+                    "- `/snipe` — See last deleted message (admin)",
                     "",
-                    "🆕 **All personal data is private, saved for YOU — `/todo` and `/note` are in **DMs only**!"
+                    "🆕 **All personal data is private, saved for YOU — `/todo` and `/note` work in **DMs only**!"
                 ].join("\n"))
                 .setColor(0xfacc15)
         ],
         ephemeral: true
     });
 });
+
 
 
 
