@@ -15,12 +15,8 @@ const DATA_DIR = "/data/";
 async function ensureDataDir() {
     try { await fs.stat(DATA_DIR); } 
     catch { await fs.mkdir(DATA_DIR, { recursive: true }) }
+}
 
-    // ---- BUTTON: Poll voting ----
-    if (interaction.isButton() && interaction.customId.startsWith("vote_")) {
-        let pollRecord = await db.get("SELECT * FROM poll WHERE messageId = ?", interaction.message.id);
-        if (!pollRecord || pollRecord.expiresAt < Date.now()) {
-            await interaction.reply({content:"This poll has ended!", ephemeral:true});
 
 // ---- SLASH: STICKY ----
 client.on('interactionCreate', async interaction => {
