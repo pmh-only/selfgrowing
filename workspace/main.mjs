@@ -140,6 +140,15 @@ await db.run(`CREATE TABLE IF NOT EXISTS reactions (
     reaction TEXT NOT NULL,
     ts INTEGER NOT NULL
 )`);
+await db.run(`CREATE TABLE IF NOT EXISTS suggestion (
+    id INTEGER PRIMARY KEY,
+    userId TEXT NOT NULL,
+    suggestion TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    votes INTEGER NOT NULL DEFAULT 0
+)`);
+
 
 // Patch: on startup, close out any expired leftover polls (shouldn't be possible, but for data consistency)
 // Protect against case client not initialized yet
@@ -504,6 +513,18 @@ const commands = [
         name: "coinflip",
         description: "Flip a coin for heads or tails!"
     },
+    {
+        name: "suggest",
+        description: "Suggest a feature or idea for this server",
+        options: [
+            { name: "text", type: 3, description: "Your suggestion", required: true }
+        ]
+    },
+    {
+        name: "suggestions",
+        description: "Show all suggestions and vote!"
+    },
+
     {
         name: "rockpaperscissors",
         description: "Play Rock Paper Scissors (vs. bot or another user)",
@@ -1111,7 +1132,79 @@ return;
 
     // --- SLASH: ROLL ---
 // UX improvement: more robust/clear error for empty input; add special "roll for initiative" preset
+    if (interaction.isChatInputCommand() && interaction.commandName === "suggest") {
+        // Suggestion feature: add suggestion to db and post it for voting
+        const text = interaction.options.getString("text")?.trim();
+        if (!text || text.length < 4) {
+            await interaction.reply({content: "Suggestion too short! Please provide more details."}); return;
+        }
+        // Insert suggestion into DB
+        await db.run(
+            "INSERT INTO suggestion(userId, suggestion, createdAt) VALUES (?,?,?)",
+            interaction.user.id, text.slice(0, 800), Date.now()
+        );
+        let lastId = (await db.get("SELECT id FROM suggestion ORDER BY id DESC LIMIT 1"))?.id;
+        // Color-UX: first suggestions are blue, after voting gold/purple
+        const embed = new EmbedBuilder()
+            .setTitle("💡 New Suggestion Pending Review")
+            .setDescription(`> ${text.slice(0,800)}`)
+            .setFooter({ text: `By <@${interaction.user.id}> | Use /suggestions to vote or comment!` })
+            .setColor(0x80deea)
+            .setTimestamp();
+        // Post quick up/down vote buttons for feedback
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`suggest_upvote_${lastId}`)
+                .setLabel("👍 Upvote")
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId(`suggest_downvote_${lastId}`)
+                .setLabel("👎 Downvote")
+                .setStyle(ButtonStyle.Danger)
+        );
+        await interaction.reply({embeds: [embed], components: [row]});
+        return;
+    }
+    if (interaction.isChatInputCommand() && interaction.commandName === "suggestions") {
+        // List active (not rejected/closed) suggestions, most recent at top
+        let recs = await db.all(
+            "SELECT * FROM suggestion WHERE status='pending' OR status='approved' ORDER BY createdAt DESC LIMIT 10"
+        );
+        if (!recs.length) {
+            await interaction.reply({content: "No suggestions yet! Use `/suggest` to add one."});
+            return;
+        }
+        // For each, show upvote/downvote counts (reaction-style voting)
+        let entries = [];
+        for (let s of recs) {
+            // Count votes as reactions (reuse reactions table by suggest_id)
+            let up = await db.all("SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='suggest:up'", "suggestion_" + s.id);
+            let down = await db.all("SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='suggest:down'", "suggestion_" + s.id);
+            entries.push({
+                ...s,
+                up: (up[0]?.n || 0),
+                down: (down[0]?.n || 0)
+            });
+        }
+        // Render an embed for each suggestion
+        let embeds = entries.map((s, idx) =>
+            new EmbedBuilder()
+                .setTitle(`Suggestion #${s.id}`)
+                .setDescription([
+                    `> ${s.suggestion}`,
+                    `By: <@${s.userId}>`,
+                    `Status: \`${s.status}\``,
+                    `👍 ${s.up} | 👎 ${s.down}`
+                ].join("\n"))
+                .setColor(0xf9a825)
+                .setFooter({ text: `Use /suggest to add your own!` })
+                .setTimestamp(s.createdAt)
+        );
+        await interaction.reply({embeds: embeds.slice(0,3)}); // Show up to 3 embeds, avoid spam
+        return;
+    }
     if (interaction.isChatInputCommand() && interaction.commandName === "roll") {
+
         try {
             // Additional Fun Feature: Multiplayer "highest d20" game!
             let selectedGame = interaction.options?.getString?.("game");
@@ -2052,7 +2145,35 @@ client.on('interactionCreate', async interaction => {
         try { await msg.react(reaction); } catch {}
         return;
     }
+
+    // Suggestion voting feature
+    if (interaction.isButton() && (/^suggest_(up|down)vote_/).test(interaction.customId)) {
+        const [, type,, sugid] = interaction.customId.split("_");
+        const sId = Number(sugid);
+        if (!sId) return void interaction.reply({content: "Invalid suggestion ID."});
+        // Only allow voting once per user per suggestion
+        let existing = await db.get(`SELECT * FROM reactions WHERE messageId=? AND userId=? AND reaction=?`,
+            "suggestion_" + sId, interaction.user.id, `suggest:${type}`);
+        if (existing) {
+            await interaction.reply({content: "You already voted on this suggestion."});
+            return;
+        }
+        // Upsert reaction, and update votes in suggestion table if necessary
+        await db.run(`INSERT INTO reactions(messageId, userId, reaction, ts) VALUES (?,?,?,?)`,
+            "suggestion_" + sId, interaction.user.id, `suggest:${type}`, Date.now());
+        // Count new votes
+        let up = await db.get(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='suggest:up'`, "suggestion_" + sId);
+        let down = await db.get(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='suggest:down'`, "suggestion_" + sId);
+        await db.run(`UPDATE suggestion SET votes=? WHERE id=?`, (up.n - down.n), sId);
+        // UX: update suggestion embed if in channel
+        await interaction.reply({content: `Thank you for your ${type === 'up' ? '👍 upvote' : '👎 downvote'}!`});
+        return;
+    }
 });
+
+
+
+
 
 
 
