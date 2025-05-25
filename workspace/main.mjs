@@ -152,6 +152,19 @@ await db.run(`CREATE TABLE IF NOT EXISTS poll (
     votes TEXT NOT NULL DEFAULT '{}',
     expiresAt INTEGER
 )`);
+await db.run(`CREATE TABLE IF NOT EXISTS reminders_log (
+    id INTEGER PRIMARY KEY,
+    userId TEXT NOT NULL,
+    content TEXT NOT NULL,
+    remindAt INTEGER NOT NULL,
+    sentAt INTEGER NOT NULL
+)`);
+// [NEW: Migrate /log existing reminders if needed (for UX review/history)]
+try {
+    const hasCol = await db.get("SELECT 1 FROM pragma_table_info('reminders_log') WHERE name = 'sentAt'");
+    // No migration needed, table just created
+} catch {}
+
 await db.run(`CREATE TABLE IF NOT EXISTS reactions (
     messageId TEXT NOT NULL,
     userId TEXT NOT NULL,
@@ -266,10 +279,15 @@ async function scheduleReminders(client) {
                 await chan.send(`<@${next.userId}>: [⏰ Reminder] ${next.content}`);
             }
             await db.run("DELETE FROM reminders WHERE id = ?", next.id);
+            // UX: Add to sent reminders log
+            try {
+                await db.run('INSERT INTO reminders_log(userId, content, remindAt, sentAt) VALUES (?,?,?,?)', next.userId, next.content, next.remindAt, Date.now());
+            } catch {}
         } catch(e){}
         scheduleReminders(client);
     }, wait);
 }
+
 
 
 
@@ -494,6 +512,11 @@ const contextCommands = [
         name: 'reminders',
         description: "List your pending reminders"
     },
+    {
+        name: 'reminderslog',
+        description: "Show all reminders ever sent (public display)"
+    },
+
     {
         name: 'settings',
         description: "Bot and channel settings (admin only)",
@@ -1084,6 +1107,27 @@ return;
         }
         return;
     }
+    // --- SLASH: REMINDERSLOG (SHOW REMINDER HISTORY) ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'reminderslog') {
+        // Show public log of all sent reminders, newest first
+        const rows = await db.all('SELECT userId, content, remindAt, sentAt FROM reminders_log ORDER BY sentAt DESC LIMIT 20');
+        if (!rows.length) {
+            await interaction.reply({content: 'No reminders have been sent yet!'});
+            return;
+        }
+        // Group by user and show details
+        let embed = new EmbedBuilder()
+            .setTitle('⏰ Reminder History (last 20)')
+            .setDescription(
+                rows.map((r, i) =>
+                    `**[${i+1}]** <@${r.userId}>: ${r.content} _(Scheduled <t:${Math.floor(r.remindAt/1000)}:R>, Sent <t:${Math.floor(r.sentAt/1000)}:R>)_`
+                ).join('\n')
+            )
+            .setColor(0x6d28d9);
+        await interaction.reply({embeds:[embed]});
+        return;
+    }
+
 
     // --- SLASH: PURGE with Confirmation and Cooldown ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'purge') {
