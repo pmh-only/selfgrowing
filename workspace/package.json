@@ -1,21 +1,28 @@
 {
-  "name": "discord-private-bot",
+  "name": "discord-largebot-main",
   "version": "1.0.0",
-  "description": "Large-scale private Discord bot with advanced features, sqlite persistence, and robust UX.",
+  "description": "A large scale Discord bot (single file) with sqlite data and productivity/game/moderation features.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
-    "start": "node main.mjs"
+    "start": "node --no-warnings main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.15.0",
-    "sqlite3": "^5.1.1",
-    "sqlite": "^5.2.4",
+    "discord.js": "^14.14.1",
+    "sqlite3": "^5.1.6",
+    "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "YourName",
+  "keywords": [
+    "discord",
+    "bot",
+    "sqlite",
+    "moderation",
+    "slash-commands",
+    "productivity"
+  ],
   "license": "MIT"
 }

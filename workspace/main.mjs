@@ -821,9 +821,9 @@ client.on('interactionCreate', async interaction => {
 
     // --- SLASH: TIMER ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'timer') {
-        // Only allow in DM
-        if (interaction.guild) {
-            await interaction.reply({content:"Use /timer in DM only!", ephemeral:true}); return;
+        // Only allow in the single main channel (no DM)
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({content:"Use /timer in the main channel only!", ephemeral:true}); return;
         }
         const name = interaction.options.getString('name').substring(0,40);
         const dur = parseTime(interaction.options.getString('duration'));
@@ -834,17 +834,22 @@ client.on('interactionCreate', async interaction => {
           const last = await db.get('SELECT * FROM timers WHERE userId=? AND name=? AND running=1', interaction.user.id, name);
           if (!last) return;
           await db.run('UPDATE timers SET running=0 WHERE id=?', last.id);
-          try { await interaction.user.send(`⏰ [TIMER "${last.name}" DONE] Your ${humanizeMs(last.duration)} timer finished!`);} catch{}
+          try {
+            const chan = client.channels.cache.get(CHANNEL_ID);
+            if (chan && chan.isTextBased && chan.send) {
+                await chan.send(`<@${interaction.user.id}>, ⏰ [TIMER "${last.name}" DONE] Your ${humanizeMs(last.duration)} timer finished!`);
+            }
+          } catch{}
         }, dur);
-        await interaction.reply({content:`⏳ Timer **"${name}"** started for ${humanizeMs(dur)}! I'll DM when done.`, ephemeral:true});
+        await interaction.reply({content:`⏳ Timer **"${name}"** started for ${humanizeMs(dur)}! I will alert **in this channel** when done.`});
         return;
     }
     if (interaction.isChatInputCommand() && interaction.commandName === "timers") {
-        if (interaction.guild) {
-            await interaction.reply({content:"Use in DM only",ephemeral:true}); return;
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({content:"Use in main channel only",ephemeral:true}); return;
         }
         const rows = await db.all('SELECT name, setAt, duration, running FROM timers WHERE userId=? ORDER BY setAt DESC LIMIT 10', interaction.user.id);
-        if (!rows.length) return void interaction.reply({content:"No running or completed timers found.", ephemeral:true});
+        if (!rows.length) return void interaction.reply({content:"No running or completed timers found."});
         let desc = rows.map(r => {
             if (r.running) {
                 let left = humanizeMs(r.setAt + r.duration - Date.now());
@@ -853,21 +858,24 @@ client.on('interactionCreate', async interaction => {
                 return `✅ **${r.name}** — finished`;
             }
         }).join('\n');
-        await interaction.reply({embeds:[new EmbedBuilder().setTitle("Your timers").setDescription(desc).setColor(0xd1882a)], ephemeral:true});
+        await interaction.reply({embeds:[new EmbedBuilder().setTitle("Your timers").setDescription(desc).setColor(0xd1882a)]});
         return;
     }
+
     // --- SLASH: REMIND ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'remind') {
+        // Move all reminders to public channel for compliance
         const content = interaction.options.getString('content').substring(0,200);
         const delay = parseTime(interaction.options.getString('time'));
         if (!delay) return void interaction.reply({content:"Invalid time. Use e.g. 10m, 2h, 1d (or combine, e.g. 1h30m)", ephemeral:true});
         if (delay > 7*24*60*60*1000) return void interaction.reply({content:"Max is 7d.",ephemeral:true});
         await db.run('INSERT INTO reminders(userId, content, remindAt) VALUES (?,?,?)',
             interaction.user.id, content, Date.now() + delay);
-        await interaction.reply({content:`⏰ Reminder set! I will DM you in ${humanizeMs(delay)}.`, ephemeral:true});
+        await interaction.reply({content:`⏰ Reminder set! I'll remind **in the main channel** in ${humanizeMs(delay)}.`});
         scheduleReminders(client);
         return;
     }
+
 
 
 
@@ -1398,25 +1406,25 @@ client.on('interactionCreate', async interaction => {
 
 
 client.on('messageCreate', async msg => {
-    if (msg.guild) return; // only DMs
+    // Only allow interactions in the ONE main channel (never DM)
+    if (!msg.guild || msg.channel.id !== CHANNEL_ID) return;
     if (msg.author.bot) return;
-    // Defensive: prevent throw if .author is undefined/null
-    if (!msg.author || !msg.author.id) return;
-    // Single welcome message per session, with "Get Started" button
+
+    // Single welcome message per user per session, with Get Started button (moved to main channel)
     if (!userWelcomeStatus[msg.author.id]) {
         await msg.reply({
             embeds: [
                 new EmbedBuilder()
                     .setTitle("👋 Welcome!")
                     .setDescription([
-                        "I'm your private assistant — **notes**, **to-do** (try `/todo`), **reminders**, **polls**, fun and more via slash commands!",
+                        "I'm your assistant bot — **notes**, **to-do** (try `/todo`), **reminders**, **polls**, fun games & more via slash commands!",
                         "",
                         "**Try:**",
-                        "- `/todo add` to manage a personal to-do list",
+                        "- `/todo add` to keep a personal to-do list",
                         "- `/note add` for quick notes",
-                        "- `/remind` for DM reminders",
+                        "- `/remind` for channel reminders",
                         "- `/avatar` to view profile pictures",
-                        "- `/quotes` to inspire/laugh",
+                        "- `/quotes` for fun/motivation",
                         "",
                         "**Click Get Started for a full command guide.**",
                     ].join("\n"))
@@ -1429,16 +1437,17 @@ client.on('messageCreate', async msg => {
     }
 
     if (msg.content.startsWith('/help')) {
-        await msg.reply(`Available commands:\n- /note\n- /note search\n- /todo\n- /remind\n- /poll #channel\n- /timer\n- /timers\n- /quotes\n\n⭐ Use /todo to pin favorites and stay organized!`);
+        await msg.reply(`Available commands:\n- /note\n- /note search\n- /todo\n- /remind\n- /poll\n- /timer\n- /timers\n- /quotes\n\n⭐ Use /todo to pin favorites and stay organized!`);
     } else if (/timer/i.test(msg.content)) {
-        await msg.reply("Try `/timer` to set a DM countdown for yourself, or `/timers` to view your timers!");
+        await msg.reply("Try `/timer` to set a channel countdown for yourself, or `/timers` to view your timers!");
     } else {
-        await msg.reply(`Hi! Slash commands available: /todo, /note, /note search, /remind, /poll, /timer, /quotes, more! (Type \`/\` to see all options, or click **Get Started** below.)`);
+        await msg.reply(`Hi! Slash commands available: /todo, /note, /note search, /remind, /poll, /timer, /quotes, games & more! (Type \`/\` to see all options, or click **Get Started** below.)`);
     }
 });
 
 
-// DM Get Started button handler for welcome embed
+
+// Get Started button handler for welcome embed (now always in main channel)
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton() || interaction.customId!=='dm_getstarted') return;
     await interaction.reply({
@@ -1450,8 +1459,8 @@ client.on('interactionCreate', async interaction => {
                     "",
                     "- `/todo add` — Pin new ideas, todos, short notes!",
                     "- `/todo list`/`complete` — View and check-off your done tasks",
-                    "- `/note add` — Quick notes (private, always DM only)",
-                    "- `/remind` — DM reminders, even days in advance!",
+                    "- `/note add` — Quick notes (in channel, visible to everyone)",
+                    "- `/remind` — Public channel reminders, even days in advance!",
                     "- `/poll` — Admins: Create quick channel polls",
                     "- `/xp` — Chat to earn XP & level up",
                     "- `/8ball` — Ask for cosmic wisdom",
@@ -1460,12 +1469,13 @@ client.on('interactionCreate', async interaction => {
                     "- `/stats` — Bot usage and content stats",
                     "- `/snipe` — See last deleted message (admin)",
                     "",
-                    "🆕 **All personal data is private, saved for YOU — `/todo` and `/note` work in **DMs only**!"
+                    "🆕 **All user data public – `/todo` and `/note` work in main channel, all can see!**"
                 ].join("\n"))
                 .setColor(0xfacc15)
         ]
     });
 });
+
 
 
 
