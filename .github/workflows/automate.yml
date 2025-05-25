@@ -7,7 +7,6 @@ on:
   
 concurrency:
   group: automate
-  cancel-in-progress: true
 
 permissions:
   contents: write
