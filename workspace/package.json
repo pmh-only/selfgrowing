@@ -1,21 +1,25 @@
 {
-  "name": "private-discord-bot",
+  "name": "discord-private-bot",
   "version": "1.0.0",
-  "description": "Private Discord bot for productivity, moderation and fun",
   "type": "module",
+  "description": "A feature-rich private Discord bot for a single channel/guild",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
+  "keywords": [
+    "discord",
+    "discord.js",
+    "bot",
+    "sqlite",
+    "slash-commands"
+  ],
+  "author": "YourName",
+  "license": "MIT",
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.13.0",
     "sqlite3": "^5.1.6",
     "sqlite": "^4.2.1",
-    "humanize-duration": "^3.31.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "author": "",
-  "license": "MIT"
+    "humanize-duration": "^3.29.0"
+  }
 }

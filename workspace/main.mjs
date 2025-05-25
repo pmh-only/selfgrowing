@@ -21,6 +21,36 @@ async function ensureDataDir() {
         let pollRecord = await db.get("SELECT * FROM poll WHERE messageId = ?", interaction.message.id);
         if (!pollRecord || pollRecord.expiresAt < Date.now()) {
             await interaction.reply({content:"This poll has ended!", ephemeral:true});
+
+// ---- SLASH: STICKY ----
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand() || interaction.commandName !== "sticky") return;
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+        await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+    }
+    let msg = interaction.options.getString('message');
+    if (msg.length > 400) msg = msg.slice(0,400) + "...";
+    if (!msg.trim() || msg.trim() === '""') {
+        await db.run("DELETE FROM sticky WHERE channelId=?", CHANNEL_ID);
+        await interaction.reply({content:"Sticky message removed.", ephemeral:true});
+        return;
+    }
+    await db.run('INSERT OR REPLACE INTO sticky(channelId, message, setBy, createdAt) VALUES (?,?,?,?)',
+        CHANNEL_ID, msg, interaction.user.id, Date.now());
+    await interaction.reply({content:`Sticky message set for this channel.`, ephemeral:true});
+    // Try to pin a message in the channel itself as sticky (if any previous sticky, try to find and edit/remove!)
+    try {
+        const chan = await client.channels.fetch(CHANNEL_ID);
+        let stickyMsgs = await chan.messages.fetch({ limit: 10 });
+        let prev = stickyMsgs.find(m=>m.author.id===client.user.id && m.content.startsWith("__**Sticky Message**__"));
+        if (prev) await prev.delete();
+        await chan.send({
+            content: `__**Sticky Message**__\n${msg}\n*(set by <@${interaction.user.id}>)*`
+        });
+    } catch{}
+    return;
+});
+
             return;
         }
         if (interaction.customId === "vote_retract") {
@@ -128,6 +158,14 @@ await db.run(`CREATE TABLE IF NOT EXISTS message_logs (
     channelId TEXT,
     messageId TEXT
 )`);
+await db.run(`CREATE TABLE IF NOT EXISTS sticky (
+    id INTEGER PRIMARY KEY,
+    channelId TEXT NOT NULL,
+    message TEXT NOT NULL,
+    setBy TEXT NOT NULL,
+    createdAt INTEGER NOT NULL
+)`);
+
 
 await db.run(`CREATE TABLE IF NOT EXISTS todo_entries (
     id INTEGER PRIMARY KEY,
@@ -389,9 +427,19 @@ const commands = [
         description: "Bot and channel settings (admin only)",
         default_member_permissions: (PermissionFlagsBits.ManageMessages).toString(),
         options: [
-            { name:'autodelete',type:5,description:"Enable/disable auto-deleting moderation bot replies",required:true }
+            { name:'autodelete',type:5,description:"Enable/disable auto-deleting moderation bot replies",required:true },
+            { name:'badword',type:3,description:"Add a blocked word (content moderation)",required:false }
         ]
     },
+    {
+        name: 'sticky',
+        description: "Pin a sticky message to the channel (admin only, replaces existing)",
+        default_member_permissions: (PermissionFlagsBits.ManageMessages).toString(),
+        options:[
+            { name:'message',type:3,description:'Message to stick (max 400 chars, use "" for none/remove)',required:true }
+        ]
+    },
+
     {
         name: 'snipe',
         description: "Show the last deleted message in this channel (moderation tool)"
@@ -930,6 +978,21 @@ client.on('messageCreate', async msg => {
     // Restrict to the one allowed channel (except for DMs)
     if (msg.guild && msg.channel.id !== CHANNEL_ID) return;
     if (msg.author.bot) return;
+
+    // STICKY: repost sticky message whenever new message in the allowed channel (don't spam too often)
+    if (msg.guild && msg.channel.id === CHANNEL_ID) {
+        let stickyRec = await db.get("SELECT * FROM sticky WHERE channelId=?", CHANNEL_ID);
+        if (stickyRec) {
+            if (!client._lastSticky || Date.now() - client._lastSticky > 60000*2) { // 2 minutes anti-spam
+                client._lastSticky = Date.now();
+                let m = await msg.channel.send({
+                    content: `__**Sticky Message**__\n${stickyRec.message}\n*(set by <@${stickyRec.setBy}>)*`
+                });
+                setTimeout(()=> m.delete().catch(()=>{}), 60000*6); // autodelete in 6 min
+            }
+        }
+    }
+
 
     // AUTO-RESPOND FRIEND MODE (fun UX): 
  
