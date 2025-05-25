@@ -784,7 +784,7 @@ return;
     // --- SLASH: QUOTES (random, filter by tag) ---
     if (interaction.isChatInputCommand() && interaction.commandName === "quotes") {
         const quotes = await readJSONFile("quotes.json", []);
-        if (!quotes.length) return void interaction.reply({content:"No quotes saved.",ephemeral:true});
+        if (!quotes.length) return void interaction.reply({content:"No quotes saved."});
         // If user types something like "/quotes category=tag" use it
         let txt = interaction.options? interaction.options.getString?.('category') : undefined;
         let show = quotes;
@@ -793,14 +793,15 @@ return;
         else txt = interaction.options.getString?.('category');
         if (txt) show = quotes.filter(q=>q.category && q.category.toLowerCase().includes(txt.toLowerCase()));
         const q = show[Math.floor(Math.random()*show.length)];
-        if (!q) return void interaction.reply({content:"No quotes matching that tag!",ephemeral:true});
+        if (!q) return void interaction.reply({content:"No quotes matching that tag!"});
         const embed = new EmbedBuilder()
             .setTitle("💬 Saved Quote")
             .setDescription(`"${q.content}"`)
             .setFooter({text: `By ${(q.user?.tag || q.author_tag || "Unknown")} at <t:${Math.floor(q.timestamp/1000)}:f>${q.category?` | #${q.category}`:""}`});
-        await interaction.reply({embeds:[embed],ephemeral:false});
+        await interaction.reply({embeds:[embed]});
         return;
     }
+
 
     // --- SLASH: QUOTEADD (NEW PUBLIC ADD QUOTE FEATURE) ---
     if (interaction.isChatInputCommand() && interaction.commandName === "quoteadd") {
