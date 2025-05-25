@@ -39,6 +39,7 @@ always remember following restrictions:
 * you need to prevent application crashing. if you need to catch error, use try/catch block and uncaughtException handler
 * do not use ephemeral messages. use normal messages
 * make all user data to public. do not use private data
+* do not use plain text command. use slash command, message component, modal and embed
 
 output a string of SEARCH/REPLACE block(s) which will be applied to the given file.
 Your SEARCH/REPLACE blocks string must be formatted as follows:
