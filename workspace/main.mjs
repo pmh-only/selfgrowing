@@ -123,8 +123,12 @@ await db.run(`CREATE TABLE IF NOT EXISTS message_logs (
     username TEXT,
     content TEXT,
     createdAt INTEGER NOT NULL,
-    deleted INTEGER NOT NULL DEFAULT 0
+    deleted INTEGER NOT NULL DEFAULT 0,
+    guildId TEXT,
+    channelId TEXT,
+    messageId TEXT
 )`);
+
 await db.run(`CREATE TABLE IF NOT EXISTS todo_entries (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,
@@ -284,9 +288,9 @@ const commands = [
             { name:'user',type:6,description:'User',required:true},
             { name:'message', type:3, description:'Message content', required:true }
         ]
-    }
-
+    },
     {
+
         name: "avatar",
         description: "Show your or another user's avatar",
         options: [
@@ -402,6 +406,7 @@ const commands = [
 const rest = new REST({version: '10'}).setToken(TOKEN);
 await rest.put(Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID), {body: commands});
 
+
 import humanizeDuration from 'humanize-duration';
 
 // --- Helper functions ---
@@ -467,6 +472,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({content: 'You cannot use me here.', ephemeral:true});
         return;
     }
+
 
     // ---- SLASH: POLL ----
     if (interaction.isChatInputCommand() && interaction.commandName === 'poll') {
@@ -926,6 +932,7 @@ client.on('messageCreate', async msg => {
     if (msg.author.bot) return;
 
     // AUTO-RESPOND FRIEND MODE (fun UX): 
+ 
     if (msg.guild && msg.mentions.has(client.user) && msg.content.length < 80) {
         let responses = [
             "Hey there! Want help? Try `/` for commands.",
@@ -936,37 +943,52 @@ client.on('messageCreate', async msg => {
             "I'm always here to assist. Type `/` to see more."
         ];
         await msg.reply({content: responses[Math.floor(Math.random()*responses.length)], ephemeral: true});
+        // User XP up for interacting directly with bot/tag
+        const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', msg.author.id) || {xp:0,level:0};
+        let xpAdd = Math.floor(Math.random()*5)+5; // boost for bot interaction
+        let xpNow = row.xp + xpAdd;
+        let lvlNow = row.level;
+        if(xpNow >= (row.level+1)*100) { xpNow=0; lvlNow++; }
+        await db.run('INSERT OR REPLACE INTO xp(userId, xp, level) VALUES (?,?,?)',
+            msg.author.id, xpNow, lvlNow);
+        if (lvlNow > row.level)
+            await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`,ephemeral:true});
     }
+
 
 
 
     // --- Log all messages for moderation/stats ---
     if (msg.guild) {
-        await db.run('INSERT INTO message_logs(userId, username, content, createdAt) VALUES (?,?,?,?)',
-            msg.author.id, (msg.member?.user?.tag || msg.author.username), msg.content, Date.now());
+        await db.run('INSERT INTO message_logs(userId, username, content, createdAt, guildId, channelId, messageId) VALUES (?,?,?,?,?,?,?)',
+            msg.author.id, (msg.member?.user?.tag || msg.author.username), msg.content, Date.now(), msg.guild.id, msg.channel.id, msg.id);
         lastMessageUserCache[msg.author.id] = { username: msg.member?.user?.tag || msg.author.username };
     }
+
 
     // Don't run in DMs except for reminders/notes slash cmds
     // XP, content moderation, games: only in main channel
     if (msg.guild) {
-        // XP: 3-10/message, 1 min cooldown
-        const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', msg.author.id) || {xp:0,level:0};
-        const lastKey = `lastxp_${msg.author.id}`;
-        if (!client[lastKey] || Date.now() - client[lastKey] > 60000) {
-            client[lastKey] = Date.now();
-            let xpAdd = Math.floor(Math.random()*8)+3;
-            let xpNow = row.xp + xpAdd;
-            let lvlNow = row.level;
-            if(xpNow >= (row.level+1)*100) { xpNow=0; lvlNow++; }
-            await db.run('INSERT OR REPLACE INTO xp(userId, xp, level) VALUES (?,?,?)',
-                msg.author.id, xpNow, lvlNow);
-            if (lvlNow > row.level)
-                await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`,ephemeral:true});
+        // XP: 3-10/message, 1 min cooldown unless XP muted for this user (content moderation improvement)
+        const muted = await db.get("SELECT 1 FROM warnings WHERE userId=? AND reason LIKE '%XP MUTE%'", msg.author.id);
+        if (!muted) {
+            const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', msg.author.id) || {xp:0,level:0};
+            const lastKey = `lastxp_${msg.author.id}`;
+            if (!client[lastKey] || Date.now() - client[lastKey] > 60000) {
+                client[lastKey] = Date.now();
+                let xpAdd = Math.floor(Math.random()*8)+3;
+                let xpNow = row.xp + xpAdd;
+                let lvlNow = row.level;
+                if(xpNow >= (row.level+1)*100) { xpNow=0; lvlNow++; }
+                await db.run('INSERT OR REPLACE INTO xp(userId, xp, level) VALUES (?,?,?)',
+                    msg.author.id, xpNow, lvlNow);
+                if (lvlNow > row.level)
+                    await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`,ephemeral:true});
+            }
         }
-
-        // Basic moderation: block bad words
-        const badwords = ['badword1','badword2','fuck','shit','bitch','asshole'];
+        // Basic moderation: block bad words, allow config of blocked words in /data/blocked_words.json
+        let dynamicBadWords = await readJSONFile("blocked_words.json", []);
+        let badwords = ['badword1','badword2','fuck','shit','bitch','asshole'].concat(dynamicBadWords);
         if (badwords.some(w=>msg.content.toLowerCase().includes(w))) {
             await db.run(
                 'UPDATE message_logs SET deleted=1 WHERE userId=? ORDER BY createdAt DESC LIMIT 1',
@@ -989,6 +1011,7 @@ client.on('messageCreate', async msg => {
             await msg.reply({content: "Detected code — save to notes?", components: [row], ephemeral:true});
         }
     }
+
 });
 
 client.on('interactionCreate', async interaction => {
@@ -1008,7 +1031,27 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
+    // Admin muting XP for a user via a context menu/user command
+    if (interaction.isUserContextMenuCommand?.() && interaction.commandName === "Mute XP") {
+        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+        }
+        await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
+            interaction.targetUser.id, "XP MUTE (admin muted)", Date.now());
+        await interaction.reply({content:`🔇 User ${interaction.targetUser.tag} will not earn XP until unmuted.`, ephemeral:true});
+        return;
+    }
+
+    // Additional feature: context menu "Add to To-Do" on user messages
+    if (interaction.isMessageContextMenuCommand?.() && interaction.commandName === "Add To-Do") {
+        let msg = interaction.targetMessage;
+        await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", interaction.user.id, msg.content.substring(0,300), Date.now());
+        await interaction.reply({content:"Added message as a to-do in your DM. Use /todo list!", ephemeral:true});
+        return;
+    }
 });
+
 
 
 
@@ -1035,6 +1078,7 @@ client.on('messageDelete', async msg => {
 });
 
 
+
 let userWelcomeStatus = {};
 
 const welcomeButtonRow = new ActionRowBuilder().addComponents(
@@ -1043,6 +1087,43 @@ const welcomeButtonRow = new ActionRowBuilder().addComponents(
         .setLabel('Get Started')
         .setStyle(ButtonStyle.Success)
 );
+
+// Listen for admin command: update blocklist dynamically (moderation tool, slash command)
+client.on('interactionCreate', async interaction => {
+    if (
+        interaction.isChatInputCommand &&
+        interaction.commandName === 'settings' &&
+        interaction.options?.getBoolean("autodelete")===false
+    ) {
+        await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "off");
+        await interaction.reply({content:"Bot reply auto-delete turned OFF.",ephemeral:true});
+        return;
+    } else if (
+        interaction.isChatInputCommand &&
+        interaction.commandName === 'settings' &&
+        interaction.options?.getBoolean("autodelete")===true
+    ) {
+        await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "on");
+        await interaction.reply({content:"Bot reply auto-delete ON (where possible).",ephemeral:true});
+        return;
+    }
+    // Example for bad-words list
+    if (
+        interaction.isChatInputCommand &&
+        interaction.commandName === 'settings' &&
+        interaction.options?.getString &&
+        interaction.options?.getString('badword')
+    ) {
+        let w = interaction.options.getString('badword').toLowerCase();
+        let baseList = await readJSONFile("blocked_words.json", []);
+        if (!baseList.includes(w)) {
+            baseList.push(w);
+            await saveJSONFile("blocked_words.json", baseList);
+        }
+        await interaction.reply({content:"Added to content blocklist.", ephemeral:true});
+        return;
+    }
+});
 
 client.on('messageCreate', async msg => {
     if (msg.guild) return; // only DMs
@@ -1111,6 +1192,8 @@ client.on('interactionCreate', async interaction => {
         ephemeral: true
     });
 });
+
+
 
 
 
