@@ -35,6 +35,7 @@ always remember following restrictions:
 * you can use slash command. message command, user commands. register interactions on startup.
 * you can use external data and npm dependencies. i will ask you about package.json later
 * you can use every intent and partials.
+* you need to prevent application crashing. if you need to catch error, use try/catch block and uncaughtException handler
 
 
 output a string of SEARCH/REPLACE block(s) which will be applied to the given file.
