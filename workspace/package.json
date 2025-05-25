@@ -1,22 +1,21 @@
 {
   "name": "discord-private-bot",
   "version": "1.0.0",
-  "description": "Private single-channel Discord bot with productivity and admin tools.",
-  "main": "main.mjs",
+  "description": "Large-scale private Discord bot with advanced features, sqlite persistence, and robust UX.",
   "type": "module",
+  "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.15.0",
     "sqlite3": "^5.1.1",
-    "sqlite": "^4.2.1",
+    "sqlite": "^5.2.4",
     "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "repository": "",
-  "author": "",
+  "author": "YourName",
   "license": "MIT"
 }

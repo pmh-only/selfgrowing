@@ -518,21 +518,21 @@ client.on('interactionCreate', async interaction => {
         (interaction.channel && interaction.channel.id !== CHANNEL_ID) &&
         (interaction.channel?.type !== 1) // 1 = DM
     ) {
-        try { await interaction.reply({content: 'You cannot use me here.', ephemeral:true}); } catch{}
+        try { await interaction.reply({content: 'You cannot use me here.'}); } catch{}
         return;
     }
     // Patch: defend against bug where interaction.channel is undefined/null in app commands (should not crash anywhere!)
     if (interaction.guild && !interaction.channel) {
-        try { await interaction.reply({content: 'Internal error: Could not fetch channel context.', ephemeral:true}); } catch{}
+        try { await interaction.reply({content: 'Internal error: Could not fetch channel context.'}); } catch{}
         return;
     }
-
 
     // Defend: prevent errors if interaction.options is not present (Discord lib bug or corruption!)
     if (typeof interaction.isChatInputCommand === "function" && interaction.isChatInputCommand() && !interaction.options) {
-        try { await interaction.reply({content:'Internal error: Missing options.',ephemeral:true}); } catch {}
+        try { await interaction.reply({content:'Internal error: Missing options.'}); } catch {}
         return;
     }
+
 
 
     // ---- SLASH: POLL ----
@@ -704,47 +704,48 @@ client.on('interactionCreate', async interaction => {
             const txt = interaction.options.getString('content').substring(0, 500);
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)',
                 interaction.user.id, txt, Date.now());
-            await interaction.reply({content:'📝 Note saved (DM only)!', ephemeral:true});
+            await interaction.reply({content:'📝 Note saved (DM only)!'});
         } else if (interaction.options.getSubcommand() === 'list') {
             const rows = await db.all('SELECT id, note, timestamp FROM notes WHERE userId=? ORDER BY id DESC LIMIT 10', interaction.user.id);
-            if (rows.length === 0) await interaction.reply({content:"No notes yet.", ephemeral:true});
+            if (rows.length === 0) await interaction.reply({content:"No notes yet."});
             else {
                 const embed = new EmbedBuilder()
                   .setTitle("Your last 10 notes")
                   .setDescription(rows.map((r,i) => `**[${rows.length-i}]** ${r.note} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
                   .setColor(0x80ecec);
-                await interaction.reply({embeds:[embed], ephemeral:true});
+                await interaction.reply({embeds:[embed]});
             }
         } else if (interaction.options.getSubcommand() === 'delete') {
             const idx = interaction.options.getInteger('number');
             const allRows = await db.all('SELECT id FROM notes WHERE userId=? ORDER BY id DESC LIMIT 10', interaction.user.id);
-            if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!", ephemeral:true});
+            if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!"});
             await db.run('DELETE FROM notes WHERE id=?', allRows[idx-1].id);
-            await interaction.reply({content:"🗑️ Note deleted.", ephemeral:true});
+            await interaction.reply({content:"🗑️ Note deleted."});
         } else if (interaction.options.getSubcommand() === "pin") {
-            await interaction.reply({content:"⚠️ To pin notes, please use `/todo add` with the note content!", ephemeral:true});
+            await interaction.reply({content:"⚠️ To pin notes, please use `/todo add` with the note content!"});
         } else if (interaction.options.getSubcommand() === "pinned") {
             const todos = await db.all("SELECT content, done, ts FROM todo_entries WHERE userId=? ORDER BY ts DESC", interaction.user.id);
             if (!todos.length)
-                return void interaction.reply({content:"No pinned notes (your pinned notes are now found in `/todo list` as your To-Do list).", ephemeral:true});
+                return void interaction.reply({content:"No pinned notes (your pinned notes are now found in `/todo list` as your To-Do list)."});
             const embed = new EmbedBuilder()
                 .setTitle("📝 Your Pinned Notes (To-Do List)")
                 .setDescription(todos.slice(0,10).map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
                 .setColor(0xfecf6a);
-            await interaction.reply({embeds:[embed], ephemeral:true});
+            await interaction.reply({embeds:[embed]});
         } else if (interaction.options.getSubcommand() === "search") {
             const query = interaction.options.getString("query").toLowerCase();
             const rows = await db.all('SELECT note, timestamp FROM notes WHERE userId=? ORDER BY id DESC LIMIT 50', interaction.user.id);
             const matches = rows.filter(r => r.note.toLowerCase().includes(query));
-            if (!matches.length) return void interaction.reply({content:`No matching notes found for "${query}".`,ephemeral:true});
+            if (!matches.length) return void interaction.reply({content:`No matching notes found for "${query}".`});
             const embed = new EmbedBuilder()
                 .setTitle(`🔎 Notes matching "${query}"`)
                 .setDescription(matches.slice(0,10).map((n,i)=>`**[${i+1}]** ${n.note} _(at <t:${Math.floor(n.timestamp/1000)}:f>)_`).join("\n"))
                 .setColor(0x4a90e2);
-            await interaction.reply({embeds:[embed], ephemeral: true});
+            await interaction.reply({embeds:[embed]});
         }
         return;
     }
+
 
 
 
@@ -764,22 +765,22 @@ client.on('interactionCreate', async interaction => {
             if (fuzzyMatch.length)
                 addMsg += `\n*Related incomplete to-dos:*\n - `+fuzzyMatch.slice(0,2).join('\n - ');
             await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", interaction.user.id, txt, Date.now());
-            await interaction.reply({content:addMsg,ephemeral:true});
+            await interaction.reply({content:addMsg});
         } else if (sub === "complete") {
             let idx = interaction.options.getInteger('number');
             let rows = await db.all("SELECT id, content FROM todo_entries WHERE userId=? ORDER BY ts DESC LIMIT 15", interaction.user.id);
-            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #", ephemeral:true});
+            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
             await db.run("UPDATE todo_entries SET done=1 WHERE id=?", rows[idx-1].id);
-            await interaction.reply({content:`✅ Marked "${rows[idx-1].content}" as done.`, ephemeral:true});
+            await interaction.reply({content:`✅ Marked "${rows[idx-1].content}" as done.`});
         } else if (sub === "remove") {
             let idx = interaction.options.getInteger('number');
             let rows = await db.all("SELECT id FROM todo_entries WHERE userId=? ORDER BY ts DESC LIMIT 15", interaction.user.id);
-            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #", ephemeral:true});
+            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
             await db.run("DELETE FROM todo_entries WHERE id=?", rows[idx-1].id);
-            await interaction.reply({content:"🗑️ To-do removed.", ephemeral:true});
+            await interaction.reply({content:"🗑️ To-do removed."});
         } else if (sub === "list") {
             let todos = await db.all("SELECT content, done, ts FROM todo_entries WHERE userId=? ORDER BY ts DESC", interaction.user.id);
-            if (!todos.length) return void interaction.reply({content:"Your to-do list is empty!",ephemeral:true});
+            if (!todos.length) return void interaction.reply({content:"Your to-do list is empty!"});
             let embed = new EmbedBuilder()
                 .setTitle("📝 Your To-Do List")
                 .setDescription(todos.map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
@@ -788,10 +789,11 @@ client.on('interactionCreate', async interaction => {
             // New UX: count completed and incomplete
             let doneCount = todos.filter(t=>t.done).length;
             embed.setFooter({text:`${todos.length} total, ${doneCount} completed, ${todos.length-doneCount} remaining`});
-            await interaction.reply({embeds:[embed], ephemeral:true});
+            await interaction.reply({embeds:[embed]});
         }
         return;
     }
+
 
 
     // --- SLASH: DMUSER ---
@@ -804,12 +806,13 @@ client.on('interactionCreate', async interaction => {
         const txt = interaction.options.getString('message');
         try {
             await user.send(`[Message from admin]\n${txt}`);
-            await interaction.reply({content:`Sent DM to ${user.tag}`, ephemeral:true});
+            await interaction.reply({content:`Sent DM to ${user.tag}`});
         } catch {
-            await interaction.reply({content:"I couldn't DM this user (maybe DM closed).", ephemeral:true});
+            await interaction.reply({content:"I couldn't DM this user (maybe DM closed)."});
         }
         return;
     }
+
 
 
 
@@ -877,12 +880,13 @@ client.on('interactionCreate', async interaction => {
         const reason = interaction.options.getString('reason').substring(0,300);
         await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
             user.id, reason, Date.now());
-        await interaction.reply({content:`⚠️ Warned ${user.tag}`,ephemeral:true});
+        await interaction.reply({content:`⚠️ Warned ${user.tag}`});
         try {
             await user.send(`[⚠️ Warning] From admins: ${reason}`);
         } catch{}
         return;
     }
+
     // --- SLASH: WARNINGS ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'warnings') {
         const tgt = interaction.options.getUser('user');
@@ -1146,7 +1150,7 @@ client.on('messageCreate', async msg => {
             "Need fun? `/8ball` awaits your questions.",
             "I'm always here to assist. Type `/` to see more."
         ];
-        await msg.reply({content: responses[Math.floor(Math.random()*responses.length)], ephemeral: true});
+        await msg.reply({content: responses[Math.floor(Math.random()*responses.length)]});
         // User XP up for interacting directly with bot/tag
         const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', msg.author.id) || {xp:0,level:0};
         let xpAdd = Math.floor(Math.random()*5)+5; // boost for bot interaction
@@ -1156,7 +1160,7 @@ client.on('messageCreate', async msg => {
         await db.run('INSERT OR REPLACE INTO xp(userId, xp, level) VALUES (?,?,?)',
             msg.author.id, xpNow, lvlNow);
         if (lvlNow > row.level)
-            await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`,ephemeral:true});
+            await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`});
     }
 
     // --- Log all messages for moderation/stats ---
@@ -1184,7 +1188,7 @@ client.on('messageCreate', async msg => {
                 await db.run('INSERT OR REPLACE INTO xp(userId, xp, level) VALUES (?,?,?)',
                     msg.author.id, xpNow, lvlNow);
                 if (lvlNow > row.level)
-                    await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`,ephemeral:true});
+                    await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`});
             }
         }
         // Basic moderation: block bad words, allow config of blocked words in /data/blocked_words.json
@@ -1197,7 +1201,7 @@ client.on('messageCreate', async msg => {
                 msg.author.id
             );
             await msg.delete().catch(()=>{});
-            await msg.reply({content:"🚫 Message removed for inappropriate language.",ephemeral:true});
+            await msg.reply({content:"🚫 Message removed for inappropriate language."});
             await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
                 msg.author.id, "Inappropriate language", Date.now());
         }
@@ -1210,11 +1214,12 @@ client.on('messageCreate', async msg => {
                     .setLabel("💾 Save this code as private note")
                     .setStyle(ButtonStyle.Success)
             );
-            await msg.reply({content: "Detected code — save to notes?", components: [row], ephemeral:true});
+            await msg.reply({content: "Detected code — save to notes?", components: [row]});
         }
     }
 
 });
+
 
 
 // --- POLL BUTTON HANDLER (button voting, retract vote) ---
@@ -1229,12 +1234,13 @@ client.on('interactionCreate', async interaction => {
             let code = (msg.content.match(/```(?:\w+\n)?([\s\S]+?)```/)||[])[1]?.trim() || msg.content.trim();
             if (!code) return void interaction.reply({content:"Couldn't find code.", ephemeral:true});
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)', interaction.user.id, code.substring(0,500), Date.now());
-            await interaction.reply({content:"✅ Code saved as private note (in `/note list` in DM).", ephemeral:true});
+            await interaction.reply({content:"✅ Code saved as private note (in `/note list` in DM)."});
         } catch(e) {
-            await interaction.reply({content:"Could not save code.", ephemeral:true});
+            await interaction.reply({content:"Could not save code."});
         }
         return;
     }
+
     // POLL VOTING BUTTON HANDLING (fix: check for expired/missing poll, UX improvement)
     if (interaction.isButton() && (/^vote_(\d)$/).test(interaction.customId) || interaction.customId==="vote_retract") {
         const mid = interaction.message?.id;
@@ -1296,10 +1302,11 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isMessageContextMenuCommand?.() && interaction.commandName === "Add To-Do") {
         let msg = interaction.targetMessage;
         await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", interaction.user.id, msg.content.substring(0,300), Date.now());
-        await interaction.reply({content:"Added message as a to-do in your DM. Use /todo list!", ephemeral:true});
+        await interaction.reply({content:"Added message as a to-do in your DM. Use /todo list!"});
         return;
     }
 });
+
 
 
 
@@ -1456,10 +1463,27 @@ client.on('interactionCreate', async interaction => {
                     "🆕 **All personal data is private, saved for YOU — `/todo` and `/note` work in **DMs only**!"
                 ].join("\n"))
                 .setColor(0xfacc15)
-        ],
-        ephemeral: true
+        ]
     });
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
