@@ -1183,6 +1183,44 @@ return;
         return;
     }
 
+    // --- SLASH: RPS-STATS ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'rps-stats') {
+        // Initialize DB table if not exists (idempotent, non-blocking)
+        try {
+            await db.run(`CREATE TABLE IF NOT EXISTS rps_stats (
+                userId TEXT NOT NULL,
+                wins INTEGER NOT NULL DEFAULT 0,
+                losses INTEGER NOT NULL DEFAULT 0,
+                draws INTEGER NOT NULL DEFAULT 0,
+                vsUserId TEXT,
+                ts INTEGER NOT NULL,
+                mode TEXT DEFAULT 'pvp'
+            )`);
+        } catch {}
+        // Aggregation: Top 10 by (wins - losses)
+        const leaderboard = await db.all(`
+            SELECT userId, SUM(wins) as win, SUM(losses) as lose, SUM(draws) as draw
+            FROM rps_stats
+            GROUP BY userId
+            ORDER BY (SUM(wins)-SUM(losses)) DESC, SUM(wins) DESC
+            LIMIT 10
+        `);
+        if (!leaderboard.length)
+            return void interaction.reply({content:"No Rock Paper Scissors stats yet."});
+
+        // Details for embed
+        let desc = leaderboard.map((r,i)=>
+            `**#${i+1} <@${r.userId}>**  — ${r.win}W/${r.lose}L/${r.draw}D`
+        ).join("\n");
+        const embed = new EmbedBuilder()
+            .setTitle("🏆 Rock Paper Scissors Leaderboard")
+            .setDescription(desc)
+            .setColor(0xf0883e);
+        await interaction.reply({embeds: [embed]});
+        return;
+    }
+
+
 
 
 
@@ -1431,17 +1469,48 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({content: "No active game! Start with `/rockpaperscissors`.", components: []});
                 return;
             }
+            // Ensure DB exists
+            try {
+                await db.run(`CREATE TABLE IF NOT EXISTS rps_stats (
+                    userId TEXT NOT NULL,
+                    wins INTEGER NOT NULL DEFAULT 0,
+                    losses INTEGER NOT NULL DEFAULT 0,
+                    draws INTEGER NOT NULL DEFAULT 0,
+                    vsUserId TEXT,
+                    ts INTEGER NOT NULL,
+                    mode TEXT DEFAULT 'pvp'
+                )`);
+            } catch {}
             const moves = ['rock','paper','scissors'];
             const playerMove = interaction.customId.replace('rps_','');
             const botMove = moves[Math.floor(Math.random()*3)];
             let resultMsg = `You chose **${playerMove}**. I chose **${botMove}**!\n`;
+            let winlose = 'draw';
             if (playerMove === botMove) resultMsg += "It's a draw!";
             else if (
                 (playerMove==='rock' && botMove==='scissors') ||
                 (playerMove==='paper' && botMove==='rock') ||
                 (playerMove==='scissors' && botMove==='paper')
-            ) resultMsg += "🎉 You win!";
-            else resultMsg += "😏 I win!";
+            ) {
+                resultMsg += "🎉 You win!";
+                winlose = 'win';
+            }
+            else {
+                resultMsg += "😏 I win!";
+                winlose = 'lose';
+            }
+            // Write to stats: mode=bot
+            try {
+                if (winlose === 'win')
+                    await db.run(`INSERT INTO rps_stats(userId, wins, losses, draws, ts, mode) VALUES (?,?,?,?,?,?)`,
+                        user.id, 1, 0, 0, Date.now(), 'bot');
+                else if (winlose === 'lose')
+                    await db.run(`INSERT INTO rps_stats(userId, wins, losses, draws, ts, mode) VALUES (?,?,?,?,?,?)`,
+                        user.id, 0, 1, 0, Date.now(), 'bot');
+                else
+                    await db.run(`INSERT INTO rps_stats(userId, wins, losses, draws, ts, mode) VALUES (?,?,?,?,?,?)`,
+                        user.id, 0, 0, 1, Date.now(), 'bot');
+            } catch {}
             await interaction.update({
                 embeds: [new EmbedBuilder()
                     .setTitle("Rock Paper Scissors Result")
@@ -1453,6 +1522,7 @@ client.on('interactionCreate', async interaction => {
             delete client._rpsPending[user.id];
             return;
         }
+
 
         // If it's an accept/decline for PvP
         if (/^(rps_accept_|rps_decline_)/.test(interaction.customId)) {
@@ -1519,13 +1589,23 @@ client.on('interactionCreate', async interaction => {
                 let moveB = movesObj[ids[1]];
                 let getName = id => "<@"+id+">";
                 let result;
-                if (moveA === moveB) result = "It's a draw!";
+                let winnerId = null, loserId = null, draw = false;
+                if (moveA === moveB) {
+                    result = "It's a draw!";
+                    draw = true;
+                }
                 else if (
                     (moveA==='rock' && moveB==='scissors') ||
                     (moveA==='paper' && moveB==='rock') ||
                     (moveA==='scissors' && moveB==='paper')
-                ) result = `${getName(ids[0])} wins! 🎉`;
-                else result = `${getName(ids[1])} wins! 🎉`;
+                ) {
+                    result = `${getName(ids[0])} wins! 🎉`;
+                    winnerId = ids[0]; loserId = ids[1];
+                }
+                else {
+                    result = `${getName(ids[1])} wins! 🎉`;
+                    winnerId = ids[1]; loserId = ids[0];
+                }
 
                 // Try to find the original message to update
                 let msgId = null;
@@ -1550,12 +1630,36 @@ client.on('interactionCreate', async interaction => {
                         });
                     } catch {}
                 }
+                // Write to rps_stats table for each player for aggregate stats!
+                try {
+                    await db.run(`CREATE TABLE IF NOT EXISTS rps_stats (
+                        userId TEXT NOT NULL,
+                        wins INTEGER NOT NULL DEFAULT 0,
+                        losses INTEGER NOT NULL DEFAULT 0,
+                        draws INTEGER NOT NULL DEFAULT 0,
+                        vsUserId TEXT,
+                        ts INTEGER NOT NULL,
+                        mode TEXT DEFAULT 'pvp'
+                    )`);
+                    if (draw) {
+                        await db.run(`INSERT INTO rps_stats(userId, wins, losses, draws, vsUserId, ts, mode) VALUES (?,?,?,?,?,?,?)`,
+                            ids[0], 0, 0, 1, ids[1], Date.now(), 'pvp');
+                        await db.run(`INSERT INTO rps_stats(userId, wins, losses, draws, vsUserId, ts, mode) VALUES (?,?,?,?,?,?,?)`,
+                            ids[1], 0, 0, 1, ids[0], Date.now(), 'pvp');
+                    } else if (winnerId && loserId) {
+                        await db.run(`INSERT INTO rps_stats(userId, wins, losses, draws, vsUserId, ts, mode) VALUES (?,?,?,?,?,?,?)`,
+                            winnerId, 1, 0, 0, loserId, Date.now(), 'pvp');
+                        await db.run(`INSERT INTO rps_stats(userId, wins, losses, draws, vsUserId, ts, mode) VALUES (?,?,?,?,?,?,?)`,
+                            loserId, 0, 1, 0, winnerId, Date.now(), 'pvp');
+                    }
+                } catch {}
                 delete client._rpsPvPMoves[key];
             }
             await interaction.reply({content:"Move received!", components: []});
             return;
         }
     }
+
     // UX: Save code as note (from message button)
     if (interaction.isButton() && interaction.customId.startsWith("save_code_note_")) {
         let mid = interaction.customId.split("_").pop();

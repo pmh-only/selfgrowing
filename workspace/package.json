@@ -1,17 +1,17 @@
 {
-  "name": "discordjs-largebot",
+  "name": "discord-bot-advanced",
   "version": "1.0.0",
+  "description": "A large-scale single-file Discord bot with sqlite DB and advanced features.",
   "type": "module",
-  "description": "Large scale Discord bot using discord.js, SQLite, and public file data.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.30.0"
+    "sqlite3": "^5.1.6",
+    "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
