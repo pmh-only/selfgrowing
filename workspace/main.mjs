@@ -98,6 +98,28 @@ const commands = [
     {
         name: 'suggest',
         description: '💡 Suggest something!',
+    },
+    {
+        name: 'reminder',
+        description: '⏰ Set a reminder!',
+        options: [
+            {
+                type: 3,
+                name: 'time',
+                description: 'After how long? e.g. 10m, 2h, 1d',
+                required: true
+            },
+            {
+                type: 3,
+                name: 'reason',
+                description: 'Reminder text',
+                required: false
+            }
+        ]
+    },
+    {
+        name: 'myreminders',
+        description: '📋 View or delete your active reminders'
     }
 ];
 

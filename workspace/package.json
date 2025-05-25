@@ -1,27 +1,21 @@
 {
-  "name": "private-discord-bot",
-  "version": "1.0.0",
+  "name": "discord-private-channel-bot",
+  "version": "1.1.0",
   "type": "module",
-  "description": "A large scale Discord bot in a single file, featuring admin, UX, and fun tools.",
   "main": "main.mjs",
+  "description": "A private, channel-locked Discord bot for moderation, utility, reminders, and quotes.",
+  "dependencies": {
+    "discord.js": "^15.14.0",
+    "sqlite3": "^5.1.7",
+    "sqlite": "^5.1.6",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node main.mjs"
   },
-  "dependencies": {
-    "discord.js": "^14.13.0",
-    "dotenv": "^16.4.5",
-    "sqlite": "^4.2.2",
-    "sqlite3": "^5.1.6"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "discord",
-    "bot",
-    "sqlite",
-    "discord.js"
-  ],
-  "author": "",
+  "author": "GPT-4R Large Scale Example Implementation",
   "license": "MIT"
 }
