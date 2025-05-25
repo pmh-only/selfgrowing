@@ -233,12 +233,26 @@ New UX/features added in this SEARCH/REPLACE update:
 
 import path from 'path';
 
+// Add context menu (right click) commands for message/user actions
+const contextCommands = [
+    {
+        name: 'Mute XP',
+        type: 2, // USER context menu
+        default_member_permissions: (PermissionFlagsBits.ManageMessages).toString(),
+    },
+    {
+        name: 'Add To-Do',
+        type: 3 // MESSAGE context menu
+    }
+];
+
 // --- Slash commands registration ---
 const commands = [
 
     {
         name: 'note',
         description: 'Add/view/delete personal notes privately.',
+
         options: [
             { name: 'add', type: 1, description: 'Add a private note', options:[{name:'content',type:3,description:'Your note',required:true}]},
             { name: 'list', type: 1, description: 'View your private notes'},
@@ -424,7 +438,8 @@ const commands = [
 
 
 const rest = new REST({version: '10'}).setToken(TOKEN);
-await rest.put(Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID), {body: commands});
+await rest.put(Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID), {body: [...commands, ...contextCommands]});
+
 
 
 import humanizeDuration from 'humanize-duration';
@@ -504,10 +519,11 @@ client.on('interactionCreate', async interaction => {
 
 
     // Defend: prevent errors if interaction.options is not present (Discord lib bug or corruption!)
-    if (interaction.isChatInputCommand && !interaction.options) {
+    if (typeof interaction.isChatInputCommand === "function" && interaction.isChatInputCommand() && !interaction.options) {
         try { await interaction.reply({content:'Internal error: Missing options.',ephemeral:true}); } catch {}
         return;
     }
+
 
     // ---- SLASH: POLL ----
     // FIX: Ensure permissions check works in DMs (where .member may be null)
@@ -1242,7 +1258,8 @@ const welcomeButtonRow = new ActionRowBuilder().addComponents(
 client.on('interactionCreate', async interaction => {
     // FIX: Guard .member on permission checks for admin DM/system
     if (
-        interaction.isChatInputCommand &&
+        typeof interaction.isChatInputCommand === "function" &&
+        interaction.isChatInputCommand() &&
         interaction.commandName === 'settings' &&
         interaction.options?.getBoolean("autodelete")===false
     ) {
@@ -1253,7 +1270,8 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({content:"Bot reply auto-delete turned OFF.",ephemeral:true});
         return;
     } else if (
-        interaction.isChatInputCommand &&
+        typeof interaction.isChatInputCommand === "function" &&
+        interaction.isChatInputCommand() &&
         interaction.commandName === 'settings' &&
         interaction.options?.getBoolean("autodelete")===true
     ) {
@@ -1266,7 +1284,8 @@ client.on('interactionCreate', async interaction => {
     }
     // Example for bad-words list
     if (
-        interaction.isChatInputCommand &&
+        typeof interaction.isChatInputCommand === "function" &&
+        interaction.isChatInputCommand() &&
         interaction.commandName === 'settings' &&
         interaction.options?.getString &&
         interaction.options?.getString('badword')
@@ -1286,9 +1305,12 @@ client.on('interactionCreate', async interaction => {
 });
 
 
+
 client.on('messageCreate', async msg => {
     if (msg.guild) return; // only DMs
     if (msg.author.bot) return;
+    // Defensive: prevent throw if .author is undefined/null
+    if (!msg.author || !msg.author.id) return;
     // Single welcome message per session, with "Get Started" button
     if (!userWelcomeStatus[msg.author.id]) {
         await msg.reply({
@@ -1323,6 +1345,7 @@ client.on('messageCreate', async msg => {
         await msg.reply(`Hi! Slash commands available: /todo, /note, /note search, /remind, /poll, /timer, /quotes, more! (Type \`/\` to see all options, or click **Get Started** below.)`);
     }
 });
+
 
 // DM Get Started button handler for welcome embed
 client.on('interactionCreate', async interaction => {
