@@ -1,16 +1,15 @@
 {
-  "name": "singlefile-discordbot",
+  "name": "private-discord-bot",
   "version": "1.0.0",
-  "description": "A private, single-channel, feature-rich Discord bot in one file, using discord.js, sqlite and fs.",
-  "main": "main.mjs",
   "type": "module",
+  "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.13.0",
     "sqlite3": "^5.1.6",
-    "sqlite": "^4.2.1",
+    "sqlite": "^4.2.2",
     "humanize-duration": "^3.29.0"
   }
 }

@@ -18,7 +18,10 @@ async function ensureDataDir() {
 }
 
 
+/*
 // ---- SLASH: STICKY ----
+*Moved below: sticky handler is consolidated inside main on('interactionCreate') to improve UX, avoid double listeners.*
+/*
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand() || interaction.commandName !== "sticky") return;
     if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
@@ -46,6 +49,8 @@ client.on('interactionCreate', async interaction => {
     } catch{}
     return;
 });
+*/
+
 
             return;
         }
@@ -130,9 +135,10 @@ await db.run(`CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,
     note TEXT NOT NULL,
-    timestamp INTEGER NOT NULL,
-    pinned INTEGER NOT NULL DEFAULT 0
+    timestamp INTEGER NOT NULL
+    -- pinned removed, migrated, see below
 )`);
+
 await db.run(`CREATE TABLE IF NOT EXISTS poll (
     id INTEGER PRIMARY KEY,
     title TEXT NOT NULL,
@@ -981,6 +987,37 @@ client.on('interactionCreate', async interaction => {
 
 
 let lastMessageUserCache = {};
+
+// ---- SLASH: STICKY (moved here for single on-interaction handler) ----
+client.on('interactionCreate', async interaction => {
+    if (interaction.isChatInputCommand() && interaction.commandName === "sticky") {
+        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+        }
+        let msg = interaction.options.getString('message');
+        if (msg.length > 400) msg = msg.slice(0,400) + "...";
+        if (!msg.trim() || msg.trim() === '""') {
+            await db.run("DELETE FROM sticky WHERE channelId=?", CHANNEL_ID);
+            await interaction.reply({content:"Sticky message removed.", ephemeral:true});
+            return;
+        }
+        await db.run('INSERT OR REPLACE INTO sticky(channelId, message, setBy, createdAt) VALUES (?,?,?,?)',
+            CHANNEL_ID, msg, interaction.user.id, Date.now());
+        await interaction.reply({content:`Sticky message set for this channel.`, ephemeral:true});
+        // Try to pin a message in the channel itself as sticky (if any previous sticky, try to find and edit/remove!)
+        try {
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            let stickyMsgs = await chan.messages.fetch({ limit: 10 });
+            let prev = stickyMsgs.find(m=>m.author.id===client.user.id && m.content.startsWith("__**Sticky Message**__"));
+            if (prev) await prev.delete();
+            await chan.send({
+                content: `__**Sticky Message**__\n${msg}\n*(set by <@${interaction.user.id}>)*`
+            });
+        } catch{}
+        return;
+    }
+});
+
 
 client.on('messageCreate', async msg => {
     // Restrict to the one allowed channel (except for DMs)
