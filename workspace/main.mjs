@@ -78,6 +78,9 @@ const client = new Client({
     ]
 });
 
+// --- Login ---
+await client.login(TOKEN);
+
 // --- Slash commands registration ---
 const commands = [
     {
@@ -316,6 +319,3 @@ client.on('messageCreate', async msg => {
         await msg.reply(`Hi! Please use slash commands for notes or reminders.`);
     }
 });
-
-// --- Login ---
-client.login(TOKEN);
