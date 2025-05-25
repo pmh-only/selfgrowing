@@ -1,4 +1,4 @@
-name: Run Automation
+name: Rebuild current source code
 
 on:
   workflow_dispatch:
