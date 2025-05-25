@@ -31,7 +31,7 @@ always remember following restrictions:
 * always prefer slash commands. also you can use message components, modal and embed
 * bot token is stored in DISCORD_TOKEN environment variable
 * guild id is stored in DISCORD_GUILD_ID environment variable
-* this bot can be used at only one channel which stored in DISCORD_CHANNEL_ID. prevent everything else except DM messaging
+* this bot can be used at only one channel which stored in DISCORD_CHANNEL_ID. prevent everything includes DM messaging
 * you can use slash command. message command, user commands. register interactions on startup.
 * you can use external data and npm dependencies. i will ask you about package.json later
 * you can use every intent and partials.
