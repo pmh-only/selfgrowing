@@ -1,19 +1,27 @@
 {
-  "name": "singlefile-discordjs-bot",
+  "name": "private-discord-bot",
   "version": "1.0.0",
-  "description": "A feature-rich Discord bot running in a single main.js file, with persistent data in /data/",
-  "main": "main.js",
-  "type": "commonjs",
+  "type": "module",
+  "description": "A large scale Discord bot in a single file, featuring admin, UX, and fun tools.",
+  "main": "main.mjs",
   "scripts": {
-    "start": "node main.js"
+    "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.13.0",
+    "dotenv": "^16.4.5",
+    "sqlite": "^4.2.2",
     "sqlite3": "^5.1.6"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "yourname",
+  "keywords": [
+    "discord",
+    "bot",
+    "sqlite",
+    "discord.js"
+  ],
+  "author": "",
   "license": "MIT"
 }
