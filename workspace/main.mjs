@@ -85,10 +85,11 @@ await client.login(TOKEN);
 const commands = [
     {
         name: 'note',
-        description: 'Add/view personal notes privately.',
+        description: 'Add/view/delete personal notes privately.',
         options: [
             { name: 'add', type: 1, description: 'Add a private note', options:[{name:'content',type:3,description:'Your note',required:true}]},
-            { name: 'list', type: 1, description: 'View your private notes'}
+            { name: 'list', type: 1, description: 'View your private notes'},
+            { name: 'delete', type: 1, description: 'Delete a note by its number', options: [{name:"number",type:4,description:"Note number from /note list",required:true}]}
         ]
     },
     {
@@ -135,6 +136,25 @@ const commands = [
         name: '8ball',
         description: 'Magic 8ball - Ask a question',
         options: [{ name:'question',type:3,description:'Your question',required:true}]
+    },
+    {
+        name: 'userinfo',
+        description: "Show user info and highlights",
+        options: [
+            { name:'user',type:6,description:"User",required:false }
+        ]
+    },
+    {
+        name: 'reminders',
+        description: "List your pending reminders"
+    },
+    {
+        name: 'settings',
+        description: "Bot and channel settings (admin only)",
+        default_member_permissions: (PermissionFlagsBits.ManageMessages).toString(),
+        options: [
+            { name:'autodelete',type:5,description:"Enable/disable auto-deleting moderation bot replies",required:true }
+        ]
     }
 ];
 

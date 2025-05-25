@@ -1,9 +1,9 @@
 {
-  "name": "discord-single-file-bot",
+  "name": "discord-utility-bot",
   "version": "1.0.0",
-  "type": "module",
+  "description": "A large-scale Discord.js utility bot with moderation, notes, reminders, XP, and more (single-channel, sqlite, persistent data)",
   "main": "main.mjs",
-  "description": "Private, single-channel Discord.js bot with xp, moderation, notes, reminders, and fun commands.",
+  "type": "module",
   "scripts": {
     "start": "node main.mjs"
   },
@@ -11,5 +11,17 @@
     "discord.js": "^14.14.1",
     "sqlite": "^4.2.1",
     "sqlite3": "^5.1.6"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "discord",
+    "discordjs",
+    "bot",
+    "sqlite",
+    "moderation",
+    "utility"
+  ],
+  "license": "MIT"
 }
