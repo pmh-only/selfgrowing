@@ -450,8 +450,16 @@ const commands = [
         options: [
             { name: "formula", type: 3, description: "Dice formula (e.g. 1d6+2)", required: false }
         ]
+    },
+    {
+        name: "rockpaperscissors",
+        description: "Play Rock Paper Scissors (vs. bot or another user)",
+        options: [
+            { name: "opponent", type: 6, description: "User to play against (optional)", required: false }
+        ]
     }
 ];
+
 
 
 
@@ -1126,6 +1134,55 @@ return;
         return;
     }
 
+    // --- SLASH: ROCK PAPER SCISSORS ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'rockpaperscissors') {
+        const opponent = interaction.options.getUser('opponent');
+        if (!opponent || opponent.bot || opponent.id === interaction.user.id) {
+            // Play against bot
+            const options = [
+                new ButtonBuilder().setCustomId('rps_rock').setLabel('🪨 Rock').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('rps_paper').setLabel('📄 Paper').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('rps_scissors').setLabel('✂️ Scissors').setStyle(ButtonStyle.Primary)
+            ];
+            const row = new ActionRowBuilder().addComponents(options);
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder().setTitle("Rock Paper Scissors")
+                    .setDescription("Choose your move against the bot:")
+                ],
+                components: [row]
+            });
+            // store context for later (map by user ID, short expiry for demo)
+            client._rpsPending = client._rpsPending || {};
+            client._rpsPending[interaction.user.id] = { against: "bot", started: Date.now(), msg: interaction };
+            setTimeout(()=>{ if(client._rpsPending[interaction.user.id]) delete client._rpsPending[interaction.user.id]; }, 120000);
+        } else {
+            // Play against another user
+            // Only allow in same channel (public UX)
+            if (opponent.bot) return void interaction.reply({content:"You cannot play against a bot!"});
+            const challengeMsg = await interaction.reply({
+                content: `<@${opponent.id}> has been challenged to Rock Paper Scissors by <@${interaction.user.id}>!`,
+                embeds: [
+                    new EmbedBuilder().setTitle("Rock Paper Scissors Challenge")
+                      .setDescription(`<@${opponent.id}>, do you accept?`)
+                      .setColor(0xffc300)
+                ],
+                components: [
+                    new ActionRowBuilder().addComponents(
+                        new ButtonBuilder().setCustomId('rps_accept_'+interaction.user.id).setLabel("Accept").setStyle(ButtonStyle.Success),
+                        new ButtonBuilder().setCustomId('rps_decline_'+interaction.user.id).setLabel("Decline").setStyle(ButtonStyle.Danger)
+                    )
+                ]
+            });
+
+            // Save challenge context
+            client._rpsPending = client._rpsPending || {};
+            client._rpsPending[opponent.id] = { vs: interaction.user.id, started: Date.now(), msgId: challengeMsg.id, channelId: interaction.channel.id };
+            setTimeout(()=>{ if(client._rpsPending[opponent.id] && Date.now()-client._rpsPending[opponent.id].started>120000){ delete client._rpsPending[opponent.id]; }; },120000);
+        }
+        return;
+    }
+
 
 
 
@@ -1135,6 +1192,7 @@ return;
 
 
     // --- SLASH: LEADERBOARD ---
+
     if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
         const rows = await db.all('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT 10');
         if (!rows.length) return void interaction.reply({content:"Leaderboard empty.",ephemeral:true});
@@ -1360,6 +1418,144 @@ client.on('messageCreate', async msg => {
 
 // --- POLL BUTTON HANDLER (button voting, retract vote) ---
 client.on('interactionCreate', async interaction => {
+    // --- ROCK PAPER SCISSORS BUTTONS ---
+    if (interaction.isButton() && /^rps_/.test(interaction.customId)) {
+        // RPS move selection
+        const user = interaction.user;
+        client._rpsPending = client._rpsPending || {};
+        // Playing against bot (no opponent set)
+        if (['rps_rock','rps_paper','rps_scissors'].includes(interaction.customId)) {
+            // Only allow if pending and not expired
+            let pending = client._rpsPending[user.id];
+            if (!pending || !pending.against || pending.against !== "bot") {
+                await interaction.reply({content: "No active game! Start with `/rockpaperscissors`.", components: []});
+                return;
+            }
+            const moves = ['rock','paper','scissors'];
+            const playerMove = interaction.customId.replace('rps_','');
+            const botMove = moves[Math.floor(Math.random()*3)];
+            let resultMsg = `You chose **${playerMove}**. I chose **${botMove}**!\n`;
+            if (playerMove === botMove) resultMsg += "It's a draw!";
+            else if (
+                (playerMove==='rock' && botMove==='scissors') ||
+                (playerMove==='paper' && botMove==='rock') ||
+                (playerMove==='scissors' && botMove==='paper')
+            ) resultMsg += "🎉 You win!";
+            else resultMsg += "😏 I win!";
+            await interaction.update({
+                embeds: [new EmbedBuilder()
+                    .setTitle("Rock Paper Scissors Result")
+                    .setDescription(resultMsg)
+                    .setColor(0x2196F3)
+                ],
+                components: []
+            });
+            delete client._rpsPending[user.id];
+            return;
+        }
+
+        // If it's an accept/decline for PvP
+        if (/^(rps_accept_|rps_decline_)/.test(interaction.customId)) {
+            let challengerId = interaction.customId.split("_")[2];
+            // Only the challenged user can click
+            if (client._rpsPending[interaction.user.id] && client._rpsPending[interaction.user.id].vs === challengerId) {
+                if (interaction.customId.startsWith('rps_accept_')) {
+                    // Start the duel! Prompt each player in DMs or via ephemeral user-friendly message
+                    let challenge = client._rpsPending[interaction.user.id];
+                    let pmBtns = new ActionRowBuilder().addComponents(
+                        new ButtonBuilder().setCustomId('rps_choice_rock_'+challengerId).setLabel('🪨 Rock').setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder().setCustomId('rps_choice_paper_'+challengerId).setLabel('📄 Paper').setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder().setCustomId('rps_choice_scissors_'+challengerId).setLabel('✂️ Scissors').setStyle(ButtonStyle.Primary)
+                    );
+                    // Initiate context for each player (record only their move)
+                    client._rpsPvPMoves = client._rpsPvPMoves || {};
+                    client._rpsPvPMoves[interaction.user.id+"_"+challengerId] = {};
+                    // Ask both players to pick (send in the channel as public for demonstration)
+                    await interaction.update({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setTitle("RPS: Game Started!")
+                                .setDescription(`<@${interaction.user.id}> vs <@${challengerId}>:\nBoth, select your move!`)
+                                .setColor(0x43d492)
+                        ],
+                        components: [pmBtns]
+                    });
+                    // Save that this message is used for this round
+                    client._rpsPvPMovesMsg = client._rpsPvPMovesMsg || {};
+                    client._rpsPvPMovesMsg[interaction.message.id] = { ids: [interaction.user.id, challengerId] };
+                } else {
+                    await interaction.update({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setTitle("RPS: Challenge Declined")
+                                .setDescription(`<@${interaction.user.id}> has declined the challenge.`)
+                                .setColor(0xca3c3c)
+                        ],
+                        components: []
+                    });
+                }
+                delete client._rpsPending[interaction.user.id];
+            } else {
+                await interaction.reply({content: "You are not the challenged user.", components: []});
+            }
+            return;
+        }
+
+        // PvP Move selection (rps_choice_<move>_<opponentid>)
+        if (/^rps_choice_(rock|paper|scissors)_/.test(interaction.customId)) {
+            let [ , , move, opponentId ] = interaction.customId.split("_");
+            let ids = [interaction.user.id, opponentId];
+            ids.sort();
+            let key = ids.join("_");
+            client._rpsPvPMoves = client._rpsPvPMoves || {};
+            client._rpsPvPMoves[key] = client._rpsPvPMoves[key] || {};
+            client._rpsPvPMoves[key][interaction.user.id] = move;
+
+            // Wait for both moves
+            let movesObj = client._rpsPvPMoves[key];
+            if (Object.keys(movesObj).length === 2) {
+                // Announce result
+                let moveA = movesObj[ids[0]];
+                let moveB = movesObj[ids[1]];
+                let getName = id => "<@"+id+">";
+                let result;
+                if (moveA === moveB) result = "It's a draw!";
+                else if (
+                    (moveA==='rock' && moveB==='scissors') ||
+                    (moveA==='paper' && moveB==='rock') ||
+                    (moveA==='scissors' && moveB==='paper')
+                ) result = `${getName(ids[0])} wins! 🎉`;
+                else result = `${getName(ids[1])} wins! 🎉`;
+
+                // Try to find the original message to update
+                let msgId = null;
+                for (let mid in (client._rpsPvPMovesMsg||{})) {
+                    let arr = client._rpsPvPMovesMsg[mid].ids;
+                    if (arr && arr.includes(ids[0]) && arr.includes(ids[1])) {
+                        msgId = mid;
+                        break;
+                    }
+                }
+                if (msgId) {
+                    try {
+                        let chan = await client.channels.fetch(CHANNEL_ID);
+                        let msg = await chan.messages.fetch(msgId);
+                        await msg.edit({
+                            embeds: [ new EmbedBuilder()
+                                .setTitle("Rock Paper Scissors Result")
+                                .setDescription(`${getName(ids[0])} chose **${moveA}**\n${getName(ids[1])} chose **${moveB}**\n${result}`)
+                                .setColor(0xf48c06)
+                            ],
+                            components: []
+                        });
+                    } catch {}
+                }
+                delete client._rpsPvPMoves[key];
+            }
+            await interaction.reply({content:"Move received!", components: []});
+            return;
+        }
+    }
     // UX: Save code as note (from message button)
     if (interaction.isButton() && interaction.customId.startsWith("save_code_note_")) {
         let mid = interaction.customId.split("_").pop();
@@ -1449,6 +1645,9 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 });
+
+
+
 
 
 
