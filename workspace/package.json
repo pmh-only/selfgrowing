@@ -1,8 +1,8 @@
 {
-  "name": "discord-productivity-bot",
-  "version": "1.0.0",
+  "name": "discord-slashbot",
   "type": "module",
-  "description": "A private Discord utility, moderation, and fun bot using discord.js and SQLite, running in single-file (main.mjs)",
+  "version": "1.0.0",
+  "description": "Large scale single-file Discord.js bot with slash commands, SQLite, and public UX improvements.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
@@ -11,11 +11,11 @@
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.30.0"
+    "humanize-duration": "^3.29.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.0.0"
   },
-  "author": "YourName",
+  "author": "",
   "license": "MIT"
 }

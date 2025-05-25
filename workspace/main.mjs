@@ -1206,8 +1206,8 @@ return;
         await interaction.reply({embeds: embeds.slice(0,3)}); // Show up to 3 embeds, avoid spam
         return;
     }
+    // --- UX improvement: Quick Roll Button (+data persistence; show leaderboard) ---
     if (interaction.isChatInputCommand() && interaction.commandName === "roll") {
-
         try {
             // Additional Fun Feature: Multiplayer "highest d20" game!
             let selectedGame = interaction.options?.getString?.("game");
@@ -1252,6 +1252,7 @@ return;
                 return;
             }
 
+            // --- Additional Feature: Roll Button After Roll for Replay and Fast Leaderboard ---
             let formula = interaction.options?.getString?.("formula");
             if (formula && formula.trim().toLowerCase() === "initiative") {
                 // Roll d20+DEX for up to 6 (prompt DMs for names/details if desired)
@@ -1269,7 +1270,12 @@ return;
             // Parse: <num>d<sides>[+/-mod][optional spaces]
             let m = formula.replace(/\s+/g,"").toLowerCase().match(/^(\d*)d(\d+)((?:[+-]\d+)*)$/);
             if (!m) {
-                await interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1`."});
+                // Provide quick buttons to roll d6 or d20 for UX
+                const rrow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId('quickroll_d6').setLabel("Roll 1d6").setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId('quickroll_d20').setLabel("Roll 1d20").setStyle(ButtonStyle.Success)
+                );
+                await interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1` or use quick buttons:", components: [rrow]});
                 return;
             }
 
@@ -1328,9 +1334,15 @@ return;
             keepRolls = keepRolls.reverse();
             await saveJSONFile("roll_history.json", keepRolls);
 
+            // Add Quick Roll Again and Leaderboard button
+            const rowButtons = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`replay_roll_${num}d${sides}${modifier>0?`+${modifier}`:(modifier<0?`${modifier}`:"")}`).setLabel("Roll Again").setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`roll_leaderboard`).setLabel("Leaderboard").setStyle(ButtonStyle.Success)
+            );
+
             await interaction.reply({embeds:[
                 new EmbedBuilder().setTitle("Dice Roll").setDescription(desc).setColor(0xffbe29)
-            ]});
+            ], components: [rowButtons]});
         } catch (e) {
             try {
                 await interaction.reply({content:"An error occurred while rolling dice."});
@@ -1338,6 +1350,7 @@ return;
         }
         return;
     }
+
 
 
     // --- SLASH: ROLLHIST ---
@@ -1779,10 +1792,129 @@ client.on('messageCreate', async msg => {
 
 
 // --- POLL & DICE-GAME BUTTON HANDLERS ---
+    // --- DICE ROLL BUTTONS (roll again, quick roll, leaderboard) ---
+    if (interaction.isButton() && (
+        /^replay_roll_/.test(interaction.customId) ||
+        /^quickroll_(d6|d20)/.test(interaction.customId) ||
+        /^roll_leaderboard$/.test(interaction.customId)
+    )) {
+        if (/^roll_leaderboard$/.test(interaction.customId)) {
+            // Re-use /rollstats logic, but as embed here!
+            try {
+                let histAll = [];
+                try { histAll = await readJSONFile("roll_history.json", []); } catch {}
+                if (!histAll.length) return void interaction.reply({content:"No roll stats yet!"});
+                let stats = {}, users = {};
+                for (let r of histAll) {
+                    stats[r.userId] = stats[r.userId] || {count:0, sum:0, top:0, name:r.userId};
+                    stats[r.userId].count++;
+                    stats[r.userId].sum += r.sum;
+                    if (r.sum > stats[r.userId].top) stats[r.userId].top = r.sum;
+                    users[r.userId] = true;
+                }
+                let userTags = {};
+                try {
+                    for (let uid of Object.keys(users)) {
+                        let u = await client.users.fetch(uid);
+                        userTags[uid] = u.tag;
+                        stats[uid].name = u.tag;
+                    }
+                } catch {}
+                let sorted = Object.values(stats).sort((a, b) => b.count - a.count);
+                let leaderboard = sorted.slice(0, 10).map((u, i) =>
+                    `**#${i+1} ${u.name||u.userId}** - ${u.count} rolls, avg: ${u.count?Math.round(u.sum/u.count):0}, best: ${u.top}`
+                );
+                await interaction.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setTitle("🎲 Dice Game Leaderboard & Stats")
+                            .setDescription(
+                                leaderboard.join('\n')
+                            ).setColor(0xd1fae5)
+                    ]
+                });
+            } catch (e) {
+                await interaction.reply({content:"Failed to compute roll stats."});
+            }
+            return;
+        }
+        // quickroll_d6, quickroll_d20, or replay_roll_{formula}
+        let formula;
+        if (/^quickroll_d6$/.test(interaction.customId)) formula = "1d6";
+        else if (/^quickroll_d20$/.test(interaction.customId)) formula = "1d20";
+        else if (/^replay_roll_/.test(interaction.customId)) formula = interaction.customId.replace(/^replay_roll_/,"");
+        else formula = "1d6";
+        // Parse formula as in slash command, fallback to 1d6
+        let m = formula.replace(/\s+/g,"").toLowerCase().match(/^(\d*)d(\d+)((?:[+-]\d+)*)$/);
+        if (!m) formula = "1d6", m = ["1d6","1","6",""];
+        let num = parseInt(m[1] || "1",10);
+        let sides = parseInt(m[2],10);
+        let modifier = 0;
+        let modmatches = (m[3]||"").match(/[+-]\d+/g);
+        if (modmatches) for (let mod of modmatches) modifier += parseInt(mod,10);
+
+        // Limits (same as /roll)
+        if (isNaN(num) || num<1 || num>100 || isNaN(sides) || sides<2 || sides>1000)
+            return void interaction.reply({content:"Dice count must be 1-100; sides 2-1000."});
+
+        // Roll!
+        let rolls = [];
+        for (let i=0;i<num;i++) rolls.push(Math.floor(Math.random()*sides)+1);
+        let sum = rolls.reduce((a,b)=>a+b,0) + modifier;
+        let desc = `🎲 Rolling: \`${num}d${sides}${modifier? (modifier>0?`+${modifier}`:modifier):""}\`  \nResults: [${rolls.join(", ")}]`
+            + (modifier ? ` ${modifier>0?"+":""}${modifier}` : "") + `\n**Total:** \`${sum}\``;
+
+        if (num > 10) {
+            desc += `\nTop rolls: ${[...rolls].sort((a,b)=>b-a).slice(0,5).join(", ")}`;
+            desc += `\nLowest: ${[...rolls].sort((a,b)=>a-b).slice(0,3).join(", ")}`;
+        }
+        if (sides===20 && num===1) {
+            if (rolls[0]===20)
+                desc += "\n🌟 **NAT 20!** Critical success!";
+            else if (rolls[0]===1)
+                desc += "\n💀 NAT 1! Oof.";
+        }
+
+        // Save to history
+        let pastRolls = [];
+        try { pastRolls = await readJSONFile("roll_history.json", []);} catch{}
+        let resultMsg = `[${rolls.join(", ")}]` + (modifier ? ` ${modifier>0?"+":""}${modifier}` : "") + ` = ${sum}`;
+        pastRolls.push({
+            userId: interaction.user.id,
+            formula: `${num}d${sides}${modifier? (modifier>0?`+${modifier}`:modifier):""}`,
+            results: rolls,
+            modifier,
+            sum,
+            at: Date.now(),
+            resultMsg
+        });
+        // Only retain 50 rolls per user
+        let keepRolls = [];
+        let rollUserCounts = {};
+        for (let r of pastRolls.reverse()) {
+            rollUserCounts[r.userId] = (rollUserCounts[r.userId]||0)+1;
+            if (rollUserCounts[r.userId]<=50) keepRolls.push(r);
+        }
+        keepRolls = keepRolls.reverse();
+        await saveJSONFile("roll_history.json", keepRolls);
+
+        // Add buttons again
+        const rowButtons = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`replay_roll_${num}d${sides}${modifier>0?`+${modifier}`:(modifier<0?`${modifier}`:"")}`).setLabel("Roll Again").setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`roll_leaderboard`).setLabel("Leaderboard").setStyle(ButtonStyle.Success)
+        );
+
+        await interaction.reply({embeds:[
+            new EmbedBuilder().setTitle("Dice Roll").setDescription(desc).setColor(0xffbe29)
+        ], components: [rowButtons]});
+        return;
+    }
+
 client.on('interactionCreate', async interaction => {
 
     // --- DICE GAME: HIGHEST MULTIPLAYER JOIN/START/CANCEL
     if (interaction.isButton() && /^join_dicegame_|^start_dicegame_|^cancel_dicegame_/.test(interaction.customId)) {
+
         const [action, , joinKey] = interaction.customId.split("_");
         client._diceGames = client._diceGames || {};
         const game = client._diceGames[joinKey];
