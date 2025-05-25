@@ -902,9 +902,7 @@ return;
 
     // --- SLASH: WARN --- 
     if (interaction.isChatInputCommand() && interaction.commandName === 'warn') {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
-        }
+        // Permissions not required - all users are 'admin' for demonstration
         const user = interaction.options.getUser('user');
         const reason = interaction.options.getString('reason').substring(0,300);
         await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
@@ -915,6 +913,7 @@ return;
         } catch{}
         return;
     }
+
 
     // --- SLASH: WARNINGS ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'warnings') {
@@ -933,9 +932,7 @@ return;
 
     // --- SLASH: PURGE with Confirmation and Cooldown ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'purge') {
-        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms."}); return;
-        }
+        // Permissions not required - all users are 'admin' for demonstration
         // Safety Cooldown
         if (!client._purgeCooldown) client._purgeCooldown = {};
         const lastT = client._purgeCooldown[interaction.user.id]||0;
@@ -966,6 +963,7 @@ return;
         client.on('interactionCreate', listener);
         return;
     }
+
 
 
     // --- SLASH: XP ---
@@ -1156,9 +1154,7 @@ let lastMessageUserCache = {};
 // ---- SLASH: STICKY (moved here for single on-interaction handler) ----
 client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand() && interaction.commandName === "sticky") {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
-        }
+        // Permissions not required - all users are 'admin' for demonstration
         let msg = interaction.options.getString('message');
         if (msg.length > 400) msg = msg.slice(0,400) + "...";
         if (!msg.trim() || msg.trim() === '""') {
@@ -1182,6 +1178,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 });
+
 
 
 client.on('messageCreate', async msg => {
@@ -1364,14 +1361,13 @@ client.on('interactionCreate', async interaction => {
 
     // Admin muting XP for a user via a context menu/user command
     if (interaction.isUserContextMenuCommand?.() && interaction.commandName === "Mute XP") {
-        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
-        }
+        // Permissions not required - all users are 'admin' for demonstration
         await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
             interaction.targetUser.id, "XP MUTE (admin muted)", Date.now());
         await interaction.reply({content:`🔇 User ${interaction.targetUser.tag} will not earn XP until unmuted.`, ephemeral:true});
         return;
     }
+
 
 
     // Additional feature: context menu "Add to To-Do" on user messages
@@ -1445,9 +1441,7 @@ client.on('interactionCreate', async interaction => {
         interaction.commandName === 'settings' &&
         interaction.options?.getBoolean("autodelete")===false
     ) {
-        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms."}); return;
-        }
+        // Permissions not required - all users are 'admin' for demonstration
         await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "off");
         await interaction.reply({content:"Bot reply auto-delete turned OFF."});
         return;
@@ -1457,9 +1451,7 @@ client.on('interactionCreate', async interaction => {
         interaction.commandName === 'settings' &&
         interaction.options?.getBoolean("autodelete")===true
     ) {
-        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms."}); return;
-        }
+        // Permissions not required - all users are 'admin' for demonstration
         await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "on");
         await interaction.reply({content:"Bot reply auto-delete ON (where possible)."});
         return;
@@ -1472,9 +1464,7 @@ client.on('interactionCreate', async interaction => {
         interaction.options?.getString &&
         interaction.options?.getString('badword')
     ) {
-        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms."}); return;
-        }
+        // Permissions not required - all users are 'admin' for demonstration
         let w = interaction.options.getString('badword').toLowerCase();
         let baseList = await readJSONFile("blocked_words.json", []);
         if (!baseList.includes(w)) {
@@ -1485,6 +1475,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 });
+
 
 
 

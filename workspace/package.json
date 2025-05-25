@@ -1,7 +1,8 @@
 {
-  "name": "discordjs-private-bot",
+  "name": "discordbot",
   "version": "1.0.0",
   "type": "module",
+  "description": "A large-scale single-file Discord bot with polls, moderation, todo, reminders, games, and more.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
@@ -11,5 +12,17 @@
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
     "humanize-duration": "^3.29.0"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "sqlite",
+    "fun",
+    "moderation"
+  ],
+  "author": "AI Assistant",
+  "license": "MIT"
 }
