@@ -19,12 +19,13 @@ errors can be anything such as but not limited:
 * syntax error
 * bracket not matching
 * undefined handling
+* tables are not exist
 
 always remember following restrictions:
 * the main.mjs file support "import" based module loading. do not use "require" based 
-* this discord bot doens't have ban or kick permission. other permissions are granted
+* this discord bot doesn't have ban or kick permission. other permissions are granted
 * this discord bot is private bot so you don't need to think about multi guild situation
-* you can use sqlite and filesystesm to save datas but use only in /data/ directory (it's absolute path. not ./data/ directory.). only that folder is persistent because this bot running on linux docker container.
+* you can use sqlite and file system to save data but use only in /data/ directory (it's absolute path. not ./data/ directory.). only that folder is persistent because this bot running on linux docker container.
 * /data/ directory and sqlite database contains previous source code's data. you need to properly modify previous data if you need to modify structure
 * always think about user ux.
 * always prefer slash commands. also you can use message components, modal and embed
@@ -32,7 +33,7 @@ always remember following restrictions:
 * guild id is stored in DISCORD_GUILD_ID environment variable
 * this bot can be used at only one channel which stored in DISCORD_CHANNEL_ID. prevent everything else except DM messaging
 * you can use slash command. message command, user commands. register interactions on startup.
-* you can use external data and npm dependancies. i will ask you about package.json later
+* you can use external data and npm dependencies. i will ask you about package.json later
 * you can use every intent and partials.
 
 
