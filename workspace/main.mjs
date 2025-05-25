@@ -138,8 +138,10 @@ await db.run(`CREATE TABLE IF NOT EXISTS reactions (
     messageId TEXT NOT NULL,
     userId TEXT NOT NULL,
     reaction TEXT NOT NULL,
-    ts INTEGER NOT NULL
+    ts INTEGER NOT NULL,
+    PRIMARY KEY (messageId, userId, reaction)
 )`);
+
 await db.run(`CREATE TABLE IF NOT EXISTS suggestion (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,

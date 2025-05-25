@@ -1,9 +1,9 @@
 {
-  "name": "discord-bot",
+  "name": "discord-bot-large-scale",
   "version": "1.0.0",
-  "description": "A feature-rich single-file Discord bot with admin, moderation, fun, and utility commands. Uses discord.js, sqlite, and more.",
-  "main": "main.mjs",
   "type": "module",
+  "description": "A large-scale private Discord bot with advanced features for a single channel.",
+  "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
@@ -11,9 +11,10 @@
     "discord.js": "^14.14.1",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.29.0"
+    "humanize-duration": "^3.30.0"
   },
   "engines": {
-    "node": ">=18"
-  }
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
 }
