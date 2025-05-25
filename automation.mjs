@@ -29,7 +29,7 @@ const source_response = await client.responses.create({
   max_output_tokens: 16384
 })
 
-await changelog.send(new Date() + ' finished: ', source_response.output_text.length + ' characters')
+await changelog.send(new Date() + ' finished: ' + source_response.output_text.length + ' characters')
 
 const requested_original = source_response.output_text.split('=======')[0].split('<<<<<<< ORIGINAL')[1].trim()
 const requested_updated = source_response.output_text.split('=======')[1].split('>>>>>>> UPDATED')[0].trim()
