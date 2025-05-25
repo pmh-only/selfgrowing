@@ -1,0 +1,54 @@
+you need to create large scale discord.js bot with single main.mjs file..
+
+understand the code and apply additional feature or ux improvement without asking or stopping
+
+features can be anything such as but not limited:
+* administration tools
+* content moderation tools
+* fun game
+* user tools
+* etc...
+
+always remember following restrictions:
+* the main.mjs file support "import" based module loading. do not use "require" based 
+* this discord bot doens't have ban or kick permission. other permissions are granted
+* this discord bot is private bot so you don't need to think about multi guild situation
+* you can use sqlite and filesystesm to save datas but use only in /data/ directory (it's absolute path. not ./data/ directory.). only that folder is persistent because this bot running on linux docker container.
+* /data/ directory and sqlite database contains previous source code's data. you need to properly modify previous data if you need to modify structure
+* always think about user ux.
+* always prefer slash commands. also you can use message components, modal and embed
+* bot token is stored in DISCORD_TOKEN environment variable
+* guild id is stored in DISCORD_GUILD_ID environment variable
+* this bot can be used at only one channel which stored in DISCORD_CHANNEL_ID. prevent everything else except DM messaging
+* you can use slash command. message command, user commands. register interactions on startup.
+* you can use external data and npm dependancies. i will ask you about package.json later
+* you can use every intent and partials.
+
+
+output a string of SEARCH/REPLACE block(s) which will be applied to the given file.
+Your SEARCH/REPLACE blocks string must be formatted as follows:
+<<<<<<< ORIGINAL
+// ... original code goes here
+=======
+// ... final code goes here
+>>>>>>> UPDATED
+
+<<<<<<< ORIGINAL
+// ... original code goes here
+=======
+// ... final code goes here
+>>>>>>> UPDATED
+
+## Guidelines:
+
+1. You may output multiple search replace blocks if needed.
+2. The ORIGINAL code in each SEARCH/REPLACE block must EXACTLY match lines in the original file. Do not add or remove any whitespace or comments from the original code.
+3. Each ORIGINAL text must be large enough to uniquely identify the change. However, bias towards writing as little as possible.
+4. Each ORIGINAL text must be DISJOINT from all other ORIGINAL text.
+5. This field is a STRING (not an array).
+6. OUTPUT only this string (do not use code block and explanation, confirmation message)
+
+Current content of main.mjs is
+
+{{source}}
+

@@ -1,0 +1,74 @@
+on:
+  push:
+  schedule:
+    - cron: '*/5 * * * *'
+  
+concurrency:
+  group: automate
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  automate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout files
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        name: Setup Node.js
+        with:
+          node-version: 'latest'
+
+      - uses: pnpm/action-setup@v4
+        name: Setup PNPM
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm i
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: automation
+        name: Run automation
+        run: node automation.mjs
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+
+      - uses: actions-js/push@master
+        name: Commit & Push changes
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          message: "${{ steps.automation.outputs.COMMIT_MESSAGE }}"
+
+      - name: Build base Docker image
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          context: workspace/
+          tags: ghcr.io/pmh-only/selfgrowing:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          

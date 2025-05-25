@@ -1,0 +1,19 @@
+{
+  "name": "singlefile-discordjs-bot",
+  "version": "1.0.0",
+  "description": "A feature-rich Discord bot running in a single main.js file, with persistent data in /data/",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "sqlite3": "^5.1.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "yourname",
+  "license": "MIT"
+}
