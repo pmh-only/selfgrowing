@@ -1,20 +1,21 @@
 {
-  "name": "discord-singlefile-bot",
+  "name": "discord-productivity-bot",
   "version": "1.0.0",
   "type": "module",
   "main": "main.mjs",
+  "scripts": {
+    "start": "node main.mjs"
+  },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.30.0"
+    "sqlite": "^5.1.1",
+    "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "scripts": {
-    "start": "node main.mjs"
-  },
-  "description": "A large scale, single-file, slash-command focused, public-data, persistent Docker Discord bot with moderation, games, and productivity tools.",
-  "author": "YourName"
+  "author": "Your Name",
+  "license": "MIT",
+  "description": "Large-scale private productivity Discord bot with slash commands, moderation, games, and sqlite persistence."
 }

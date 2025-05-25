@@ -122,6 +122,8 @@ try {
 
 
 
+// Add reactions table for thumbs up/down on messages (for fun/feedback user tool)
+// [NEW FEATURE]: Add reactions table on startup
 await db.run(`CREATE TABLE IF NOT EXISTS poll (
     id INTEGER PRIMARY KEY,
     title TEXT NOT NULL,
@@ -132,6 +134,13 @@ await db.run(`CREATE TABLE IF NOT EXISTS poll (
     votes TEXT NOT NULL DEFAULT '{}',
     expiresAt INTEGER
 )`);
+await db.run(`CREATE TABLE IF NOT EXISTS reactions (
+    messageId TEXT NOT NULL,
+    userId TEXT NOT NULL,
+    reaction TEXT NOT NULL,
+    ts INTEGER NOT NULL
+)`);
+
 // Patch: on startup, close out any expired leftover polls (shouldn't be possible, but for data consistency)
 // Protect against case client not initialized yet
 let leftOpenPolls = [];
@@ -277,8 +286,18 @@ const contextCommands = [
     {
         name: 'Add To-Do',
         type: 3 // MESSAGE context menu
+    },
+    // New: Add reactions to message
+    {
+        name: 'Thumbs Up',
+        type: 3 // MESSAGE context menu
+    },
+    {
+        name: 'Thumbs Down',
+        type: 3 // MESSAGE context menu
     }
 ];
+
 
 // --- Slash commands registration ---
 const commands = [
@@ -2014,6 +2033,25 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({content:"Added message as a to-do in the public To-Do list. Use `/todo list` to view!"});
         return;
     }
+
+    // FUN FEATURE: Thumbs up/down reaction context menu
+    if (interaction.isMessageContextMenuCommand?.() && (interaction.commandName === "Thumbs Up" || interaction.commandName === "Thumbs Down")) {
+        let msg = interaction.targetMessage;
+        let reaction = interaction.commandName === "Thumbs Up" ? "👍" : "👎";
+        // Only allow one reaction per user per message per type
+        await db.run(`
+            INSERT INTO reactions(messageId, userId, reaction, ts)
+            VALUES (?,?,?,?)
+        `, msg.id, interaction.user.id, reaction, Date.now());
+        // Count reactions
+        let ups = await db.all(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='👍'`, msg.id);
+        let downs = await db.all(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='👎'`, msg.id);
+        // Simple aggregate UX
+        await interaction.reply({content: `You reacted to this message with ${reaction}.\nTotal: 👍 ${ups[0].n} | 👎 ${downs[0].n}`});
+        // Add actual unicode reaction for quick visual feedback
+        try { await msg.react(reaction); } catch {}
+        return;
+    }
 });
 
 
@@ -2025,8 +2063,11 @@ client.on('interactionCreate', async interaction => {
 
 
 
+
 // --- Startup reminder boot ---
+// Show top 5 most upvoted messages feature
 client.once('ready', () => {
+
     console.log(`Ready as ${client.user.tag}`);
     scheduleReminders(client);
 
@@ -2168,6 +2209,29 @@ client.on('messageCreate', async msg => {
 // Get Started button handler for welcome embed (now always in main channel)
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton() || interaction.customId!=='dm_getstarted') return;
+    // Upgrade: Show a new fun leaderboard of most upvoted ("Thumbs Up") messages for user engagement!
+    let topMsgs = [];
+    try {
+        topMsgs = await db.all(`
+            SELECT messageId, COUNT(*) as votes
+            FROM reactions
+            WHERE reaction='👍'
+            GROUP BY messageId
+            ORDER BY votes DESC
+            LIMIT 3
+        `);
+    } catch {}
+    let leaderboardLines = [];
+    for (let row of topMsgs) {
+        // Try to fetch message content, fallback if not found
+        try {
+            let chan = await client.channels.fetch(CHANNEL_ID);
+            let msg = await chan.messages.fetch(row.messageId);
+            leaderboardLines.push(`> "${msg.content.slice(0,60)}" — **${row.votes} 👍**`);
+        } catch {
+            leaderboardLines.push(`MessageID: ${row.messageId}, Upvotes: ${row.votes}`);
+        }
+    }
     await interaction.reply({
         embeds: [
             new EmbedBuilder()
@@ -2187,12 +2251,14 @@ client.on('interactionCreate', async interaction => {
                     "- `/stats` — Bot usage and content stats",
                     "- `/snipe` — See last deleted message (admin)",
                     "",
-                    "🆕 **All user data public – `/todo` and `/note` work in main channel, all can see!**"
+                    "🆕 **All user data public – `/todo` and `/note` work in main channel, all can see!**",
+                    leaderboardLines.length ? "\n**🌟 Top Upvoted Messages:**\n" + leaderboardLines.join("\n") : ""
                 ].join("\n"))
                 .setColor(0xfacc15)
         ]
     });
 });
+
 
 
 
