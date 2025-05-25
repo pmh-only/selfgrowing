@@ -14,7 +14,72 @@ const DATA_DIR = "/data/";
 // Ensure data dir
 async function ensureDataDir() {
     try { await fs.stat(DATA_DIR); } 
-    catch { await fs.mkdir(DATA_DIR, { recursive: true }); }
+    catch { await fs.mkdir(DATA_DIR, { recursive: true }
+
+    // ---- BUTTON: Poll voting ----
+    if (interaction.isButton() && interaction.customId.startsWith("vote_")) {
+        let pollRecord = await db.get("SELECT * FROM poll WHERE messageId = ?", interaction.message.id);
+        if (!pollRecord || pollRecord.expiresAt < Date.now()) {
+            await interaction.reply({content:"This poll has ended!", ephemeral:true});
+            return;
+        }
+        const optionIdx = parseInt(interaction.customId.split("_")[1]);
+        let votes = {};
+        try { votes = JSON.parse(pollRecord.votes || "{}"); } catch {}
+        votes[interaction.user.id] = optionIdx;
+        await db.run("UPDATE poll SET votes=? WHERE messageId=?", JSON.stringify(votes), interaction.message.id);
+
+        // Tally and update poll message with visually updated buttons
+        // Show current results only to voter
+        const opts = JSON.parse(pollRecord.options);
+        let counts = opts.map((_,i)=>Object.values(votes).filter(v=>v==i).length);
+        let total = counts.reduce((a,b)=>a+b,0);
+        let userVote = optionIdx;
+        let desc = opts.map((opt,i)=>
+            `${pollEmojis[i]} **${opt}** — ${counts[i]} vote${counts[i]!=1?'s':''}` +
+            (userVote===i ? " **⬅️ Your selection**" : "")
+        ).join("\n");
+        if (total===0) desc+="\n*No votes yet*";
+
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle(`📊 ${pollRecord.title} (Vote Registered)`)
+                    .setDescription(desc)
+                    .setFooter({text: `Poll closes at <t:${Math.floor(pollRecord.expiresAt/1000)}:f>`})
+            ],
+            ephemeral: true
+        });
+        // Quick UX: acknowledge on button, don't update base poll message (other than at end)
+        return;
+    }
+});
+
+// ------- Helper: End poll and show results ---------
+async function finishPoll(pollRec, chan) {
+    try {
+        const opts = JSON.parse(pollRec.options);
+        const votes = JSON.parse(pollRec.votes || '{}');
+        let counts = opts.map((_,i)=>Object.values(votes).filter(v=>v==i).length);
+        let desc = opts.map((opt,i)=>`${pollEmojis[i]} **${opt}** — ${counts[i]} vote${counts[i]!=1?'s':''}`).join("\n");
+        let winners = [];
+        let max = Math.max(...counts);
+        for (let i=0;i<counts.length;i++) if (counts[i]===max && max>0) winners.push(opts[i]);
+        desc += `\n\nWinner${winners.length>1?'s':''}: **${winners.join(', ')||"N/A"}**`;
+        await chan.messages.edit(pollRec.messageId, {
+            embeds:[
+                new EmbedBuilder()
+                .setTitle("📊 [Poll Closed] "+pollRec.title)
+                .setDescription(desc)
+                .setColor(0x8B5CFF)
+            ],
+            components: []
+        });
+        // Remove poll from db
+        await db.run("DELETE FROM poll WHERE id=?", pollRec.id);
+    } catch {}
+}
+ }
 }
 await ensureDataDir();
 
@@ -121,6 +186,44 @@ const commands = [
             { name: 'pinned', type: 1, description: 'View your pinned notes'}
         ]
     },
+    {
+        name: "poll",
+        description: "Create a quick poll for this channel (max 5 options)",
+        default_member_permissions: (PermissionFlagsBits.ManageMessages).toString(),
+        options: [
+            { name: "title", type: 3, description: "Poll question", required: true },
+            { name: "option1", type: 3, description: "Option 1", required: true },
+            { name: "option2", type: 3, description: "Option 2", required: true },
+            { name: "option3", type: 3, description: "Option 3", required: false },
+            { name: "option4", type: 3, description: "Option 4", required: false },
+            { name: "option5", type: 3, description: "Option 5", required: false },
+            { name: "duration", type: 3, description: "Poll duration (e.g. 5m, 1h)", required: false }
+        ]
+    },
+    {
+        name: "pollresults",
+        description: "Show active poll results"
+    },
+    {
+        name: "avatar",
+        description: "Show your or another user's avatar",
+        options: [
+            { name: "user", type: 6, description: "User", required: false }
+        ]
+    },
+    {
+        name: "quote",
+        description: "Save a funny/interesting message (admin only)",
+        default_member_permissions: (PermissionFlagsBits.ManageMessages).toString(),
+        options: [
+            { name: "message_link", type: 3, description: "Message link", required: true }
+        ]
+    },
+    {
+        name: "quotes",
+        description: "Show a random saved quote"
+    },
+
 
     {
         name: 'remind',
@@ -230,6 +333,26 @@ function parseTime(s) {
 function humanizeMs(ms) {
     return humanizeDuration(ms, { largest: 2, round: true, conjunction: " and ", serialComma: false });
 }
+
+// -------- Helper: Read/write JSON file (e.g. /data/quotes.json) ----------
+async function readJSONFile(filename, fallback = []) {
+    try {
+        const d = await fs.readFile(DATA_DIR + filename, { encoding: "utf8" });
+        return JSON.parse(d);
+    } catch (e) {
+        return fallback;
+    }
+}
+async function saveJSONFile(filename, data) {
+    await fs.writeFile(DATA_DIR + filename, JSON.stringify(data, null, 2));
+}
+
+// ------- Poll emoji array (unicode to maximize accessibility) --------
+const pollEmojis = [
+    '🇦', '🇧', '🇨', '🇩', '🇪'
+];
+
+
 const eightBallResponses = [
     'Yes.', 'No.', 'Maybe.', 'Definitely.', 'Ask again later.', "I don't know.", 'Doubtful.', 'Certainly.', 'Absolutely not.', 'For sure!'
 ];
@@ -246,8 +369,119 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    // ---- SLASH: POLL ----
+    if (interaction.isChatInputCommand() && interaction.commandName === 'poll') {
+        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+        }
+        const title = interaction.options.getString("title");
+        const opts = [];
+        for (let i=1;i<=5;i++) {
+            const o = interaction.options.getString("option"+i);
+            if (o) opts.push(o.substring(0,100));
+        }
+        if (opts.length < 2) return void interaction.reply({content:"At least 2 options required!",ephemeral:true});
+        const dur = parseTime(interaction.options.getString("duration")) || 15*60*1000;
+        if (dur > 24*60*60*1000) return void interaction.reply({content:"Max poll duration is 24h",ephemeral:true});
+        const embed = new EmbedBuilder()
+            .setTitle("📊 "+title)
+            .setDescription(opts.map((o,i)=>`${pollEmojis[i]} ${o}`).join("\n"))
+            .setFooter({ text: `Poll ends in ${humanizeMs(dur)}` })
+            .setColor(0x0ebbaf);
+        const row = new ActionRowBuilder().addComponents(
+            opts.map((_,i)=>
+                new ButtonBuilder().setCustomId(`vote_${i}`).setLabel(String.fromCharCode(65+i)).setStyle(ButtonStyle.Primary)
+            )
+        );
+        const cmsg = await interaction.reply({ embeds: [embed], components:[row], fetchReply:true });
+        await db.run(`
+            INSERT INTO poll(title, options, creatorId, channelId, messageId, votes, expiresAt)
+            VALUES (?,?,?,?,?,?,?)
+        `, title, JSON.stringify(opts), interaction.user.id, interaction.channel.id, cmsg.id, '{}', Date.now()+dur);
+        setTimeout(async ()=>{
+            let p = await db.get('SELECT * FROM poll WHERE messageId=?', cmsg.id);
+            if (!p) return;
+            await finishPoll(p, interaction.channel);
+        }, dur);
+        return;
+    }
+
+    // -- SLASH: POLLRESULTS --
+    if (interaction.isChatInputCommand() && interaction.commandName === "pollresults") {
+        const active = await db.get("SELECT * FROM poll WHERE expiresAt > ? AND channelId=? ORDER BY id DESC LIMIT 1", Date.now(), CHANNEL_ID);
+        if (!active) return void interaction.reply({content:"No active poll.", ephemeral:true});
+        const opts = JSON.parse(active.options);
+        const votes = JSON.parse(active.votes || '{}');
+        let counts = opts.map((_,i)=>Object.values(votes).filter(v=>v==i).length);
+        let total = counts.reduce((a,b)=>a+b,0);
+        let desc = opts.map((opt,i)=>`${pollEmojis[i]} **${opt}** — ${counts[i]} vote${counts[i]!=1?'s':''}`).join("\n");
+        if (total===0) desc+="\n*No votes yet*";
+        const embed = new EmbedBuilder()
+            .setTitle(`Poll Results: ${active.title}`)
+            .setDescription(desc)
+            .setFooter({text: `Poll closes at <t:${Math.floor(active.expiresAt/1000)}:f>`})
+            .setColor(0x0ebbaf);
+        await interaction.reply({embeds:[embed], ephemeral:false});
+        return;
+    }
+
+    // --- SLASH: AVATAR ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "avatar") {
+        const tgt = interaction.options.getUser("user") || interaction.user;
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle(`${tgt.tag}'s Avatar`)
+                    .setImage(tgt.displayAvatarURL({ extension: 'png', size: 4096}))
+                    .setColor(0x30cdfa)
+            ], ephemeral: true
+        });
+        return;
+    }
+
+    // --- SLASH: QUOTE (admin) ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "quote") {
+        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+            await interaction.reply({content:"You lack perms.", ephemeral:true});
+            return;
+        }
+        const link = interaction.options.getString("message_link");
+        const arr = link.match(/\/channels\/\d+\/(\d+)\/(\d+)$/);
+        if (!arr) return void interaction.reply({content:"Invalid message link.",ephemeral:true});
+        const [,chanid,msgid] = arr;
+        try {
+            const chan = await client.channels.fetch(chanid);
+            const msg = await chan.messages.fetch(msgid);
+            let quotes = await readJSONFile("quotes.json", []);
+            quotes.push({
+                user: {id: msg.author.id, tag: msg.author.tag },
+                content: msg.content,
+                timestamp: msg.createdTimestamp
+            });
+            await saveJSONFile("quotes.json", quotes);
+            await interaction.reply({content:`✅ Quote saved:\n> "${msg.content}" — ${msg.author.tag}`,ephemeral:true});
+        } catch(e) {
+            await interaction.reply({content:"Could not fetch message.",ephemeral:true});
+        }
+        return;
+    }
+
+    // --- SLASH: QUOTES (random) ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "quotes") {
+        const quotes = await readJSONFile("quotes.json", []);
+        if (!quotes.length) return void interaction.reply({content:"No quotes saved.",ephemeral:true});
+        const q = quotes[Math.floor(Math.random()*quotes.length)];
+        const embed = new EmbedBuilder()
+            .setTitle("💬 Saved Quote")
+            .setDescription(`"${q.content}"`)
+            .setFooter({text: `By ${q.user.tag} at <t:${Math.floor(q.timestamp/1000)}:f>`});
+        await interaction.reply({embeds:[embed],ephemeral:false});
+        return;
+    }
+
     // --- SLASH: NOTE ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'note') {
+
         if (interaction.options.getSubcommand() === 'add') {
             const txt = interaction.options.getString('content').substring(0, 500);
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)',
@@ -478,6 +712,7 @@ client.on('messageDelete', async msg => {
 
 let userWelcomeStatus = {};
 
+// --- DM Welcome/Help, now also includes 'quotes', 'avatar' ---
 client.on('messageCreate', async msg => {
     if (msg.guild) return; // only DMs
     if (msg.author.bot) return;
@@ -489,12 +724,14 @@ client.on('messageCreate', async msg => {
                 new EmbedBuilder()
                     .setTitle("👋 Welcome!")
                     .setDescription([
-                        "I'm your assistant bot, available for **notes**, **reminders**, and more, all via slash commands 😃",
+                        "I'm your assistant bot, available for **notes**, **reminders**, **polls**, and more via slash commands 😃",
                         "",
                         "**Try:**",
                         "- `/note add [content]` - Save a private note",
                         "- `/remind [content] [time]` - Get a DM reminder",
                         "- `/note pin [number]` - Pin important notes",
+                        "- `/quotes` - A random saved quote",
+                        "- `/avatar` - Show profile pic",
                         "",
                         "_For all commands, type `/` and browse the menu!_"
                     ].join("\n"))
@@ -506,11 +743,17 @@ client.on('messageCreate', async msg => {
     }
 
     if (msg.content.startsWith('/help')) {
-        await msg.reply(`Available commands:\n- /note\n- /remind\n- /note pin\n\n⭐ Use /note pin to pin your favorite notes!`);
+        await msg.reply(`Available commands:\n- /note\n- /remind\n- /note pin\n- /poll\n- /quotes\n\n⭐ Use /note pin to pin your favorite notes!`);
     } else {
-        await msg.reply(`Hi! Please use slash commands for notes, reminders, and new features like pinning notes! (Type \`/\` to open all options!)`);
+        await msg.reply(`Hi! Please use slash commands such as /note, /remind, /poll, /avatar, /quotes and more! (Type \`/\` to see all options.)`);
     }
 });
+
+
+
+
+
+
 
 
 

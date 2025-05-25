@@ -1,7 +1,7 @@
 {
-  "name": "discord-private-bot",
-  "version": "1.0.0",
-  "description": "A single-channel, single-guild advanced Discord.js private bot with persistent SQLite/FS data.",
+  "name": "discord-single-channel-bot",
+  "version": "1.1.0",
+  "description": "A single-file Discord bot (discord.js, sqlite, private channel, slash commands, polls, notes, reminders, quotes, moderation)",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -11,18 +11,11 @@
     "discord.js": "^14.14.1",
     "sqlite": "^4.2.2",
     "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.29.0"
+    "humanize-duration": "^3.31.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": [
-    "discord",
-    "discord-bot",
-    "bot",
-    "sqlite",
-    "private-bot"
-  ],
   "author": "",
-  "license": "ISC"
+  "license": "MIT"
 }
