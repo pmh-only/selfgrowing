@@ -200,19 +200,40 @@ const commands = [
 const rest = new REST({version: '10'}).setToken(TOKEN);
 await rest.put(Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID), {body: commands});
 
+import humanizeDuration from 'humanize-duration';
+
 // --- Helper functions ---
 function parseTime(s) {
+    if (!s) return null;
+    s = s.trim();
     const m = s.match(/^(\d+)(m|h|d)$/i);
-    if (!m) return null;
-    const n = Number(m[1]);
-    if(m[2]==='m') return n*60*1000;
-    if(m[2]==='h') return n*60*60*1000;
-    if(m[2]==='d') return n*24*60*60*1000;
-    return null;
+    if (m) {
+        const n = Number(m[1]);
+        if (m[2] === 'm') return n * 60 * 1000;
+        if (m[2] === 'h') return n * 60 * 60 * 1000;
+        if (m[2] === 'd') return n * 24 * 60 * 60 * 1000;
+    }
+    // support more flexible time (e.g. 1h30m, 2d6h, etc)
+    let total = 0;
+    const regex = /(\d+)([smhd])/g;
+    let match;
+    while ((match = regex.exec(s)) !== null) {
+        const v = Number(match[1]);
+        if (match[2] === 's') total += v * 1000;
+        if (match[2] === 'm') total += v * 60 * 1000;
+        if (match[2] === 'h') total += v * 60 * 60 * 1000;
+        if (match[2] === 'd') total += v * 24 * 60 * 60 * 1000;
+    }
+    return total || null;
+}
+
+function humanizeMs(ms) {
+    return humanizeDuration(ms, { largest: 2, round: true, conjunction: " and ", serialComma: false });
 }
 const eightBallResponses = [
     'Yes.', 'No.', 'Maybe.', 'Definitely.', 'Ask again later.', "I don't know.", 'Doubtful.', 'Certainly.', 'Absolutely not.', 'For sure!'
 ];
+
 
 // --- Restrict allowed channel for MESSAGE & SLASH --- 
 client.on('interactionCreate', async interaction => {
@@ -275,14 +296,15 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand() && interaction.commandName === 'remind') {
         const content = interaction.options.getString('content').substring(0,200);
         const delay = parseTime(interaction.options.getString('time'));
-        if (!delay) return void interaction.reply({content:"Invalid time. Use e.g. 10m, 2h, 1d", ephemeral:true});
+        if (!delay) return void interaction.reply({content:"Invalid time. Use e.g. 10m, 2h, 1d (or combine, e.g. 1h30m)", ephemeral:true});
         if (delay > 7*24*60*60*1000) return void interaction.reply({content:"Max is 7d.",ephemeral:true});
         await db.run('INSERT INTO reminders(userId, content, remindAt) VALUES (?,?,?)',
             interaction.user.id, content, Date.now() + delay);
-        await interaction.reply({content:`⏰ Reminder set! I will DM you in ${interaction.options.getString('time')}.`, ephemeral:true});
+        await interaction.reply({content:`⏰ Reminder set! I will DM you in ${humanizeMs(delay)}.`, ephemeral:true});
         scheduleReminders(client);
         return;
     }
+
     // --- SLASH: WARN --- 
     if (interaction.isChatInputCommand() && interaction.commandName === 'warn') {
         if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
@@ -438,7 +460,14 @@ client.on('messageCreate', async msg => {
 client.once('ready', () => {
     console.log(`Ready as ${client.user.tag}`);
     scheduleReminders(client);
+
+    // Custom status
+    client.user.setActivity({
+        type: 3, // "Watching"
+        name: "slash commands! (/help)"
+    });
 });
+
 
 client.on('messageDelete', async msg => {
     // Log which message was deleted for use with /snipe
@@ -447,15 +476,42 @@ client.on('messageDelete', async msg => {
     }
 });
 
-// --- DMs: Accept notes/reminders only
+let userWelcomeStatus = {};
+
 client.on('messageCreate', async msg => {
     if (msg.guild) return; // only DMs
     if (msg.author.bot) return;
+
+    // DM Help improvement: Welcomes first time in session
+    if (!userWelcomeStatus[msg.author.id]) {
+        await msg.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("👋 Welcome!")
+                    .setDescription([
+                        "I'm your assistant bot, available for **notes**, **reminders**, and more, all via slash commands 😃",
+                        "",
+                        "**Try:**",
+                        "- `/note add [content]` - Save a private note",
+                        "- `/remind [content] [time]` - Get a DM reminder",
+                        "- `/note pin [number]` - Pin important notes",
+                        "",
+                        "_For all commands, type `/` and browse the menu!_"
+                    ].join("\n"))
+                    .setColor(0x6ee7b7)
+            ]
+        });
+        userWelcomeStatus[msg.author.id] = true;
+        return;
+    }
+
     if (msg.content.startsWith('/help')) {
-        await msg.reply(`Available commands:\n- /note\n- /remind\n\n⭐ You can now pin notes using /note pin!`);
+        await msg.reply(`Available commands:\n- /note\n- /remind\n- /note pin\n\n⭐ Use /note pin to pin your favorite notes!`);
     } else {
-        await msg.reply(`Hi! Please use slash commands for notes, reminders, and new features like pinning notes!`);
+        await msg.reply(`Hi! Please use slash commands for notes, reminders, and new features like pinning notes! (Type \`/\` to open all options!)`);
     }
 });
+
+
 
 
