@@ -1,21 +1,29 @@
 {
-  "name": "discord-productivity-bot",
+  "name": "discordjs-private-productivity-bot",
   "version": "1.0.0",
+  "description": "A productivity-focused, private Discord bot for notes, reminders, to-do, polls, moderation, fun & more. Single channel+DM only.",
   "type": "module",
-  "description": "Private scalable productivity discord bot with slash commands, moderation, games, and more.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
-  "dependencies": {
-    "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
-    "sqlite": "^5.1.1",
-    "humanize-duration": "^3.29.0"
-  },
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "Your Name",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "sqlite3": "^5.1.1",
+    "sqlite": "^4.2.1",
+    "humanize-duration": "^3.30.0"
+  },
+  "keywords": [
+    "discord",
+    "discordjs",
+    "bot",
+    "productivity",
+    "sqlite",
+    "slash-commands"
+  ],
+  "author": "",
   "license": "MIT"
 }

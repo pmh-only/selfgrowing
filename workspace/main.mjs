@@ -56,6 +56,22 @@ await db.run(`CREATE TABLE IF NOT EXISTS notes (
     timestamp INTEGER NOT NULL
     -- pinned removed, migrated, see below
 )`);
+// Fix error: ensure any legacy pinned_notes table is not left broken (after new deploys/updates)
+// Only try to use it if it really exists.
+try {
+    // Try to select from pinned_notes (legacy table) if exists, to avoid SELECT * FROM non-existing table errors
+    let tbls = await db.all("SELECT name FROM sqlite_master WHERE type='table'");
+    const needsMigrate = tbls.some(t=>t.name==="pinned_notes");
+    if (needsMigrate) {
+        // Try SELECT and DROP in try/catch (persist old format migration)
+        try {
+            await db.all("SELECT * FROM pinned_notes");
+            // If we were able to select, attempt migration (idempotent)
+            await migratePinnedToTodo();
+        } catch {}
+    }
+} catch {}
+
 
 await db.run(`CREATE TABLE IF NOT EXISTS poll (
     id INTEGER PRIMARY KEY,
@@ -67,6 +83,15 @@ await db.run(`CREATE TABLE IF NOT EXISTS poll (
     votes TEXT NOT NULL DEFAULT '{}',
     expiresAt INTEGER
 )`);
+// Patch: on startup, close out any expired leftover polls (shouldn't be possible, but for data consistency)
+const leftOpenPolls = await db.all(`SELECT * FROM poll WHERE expiresAt IS NOT NULL AND expiresAt < ?`, Date.now());
+for (const pollRec of leftOpenPolls) {
+    try {
+        const chan = await client.channels.fetch(pollRec.channelId);
+        await finishPoll(pollRec, chan);
+    } catch {}
+}
+
 await db.run(`CREATE TABLE IF NOT EXISTS message_logs (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,
@@ -459,12 +484,23 @@ client.on('interactionCreate', async interaction => {
         try { await interaction.reply({content: 'You cannot use me here.', ephemeral:true}); } catch{}
         return;
     }
+    // Patch: defend against bug where interaction.channel is undefined/null in app commands (should not crash anywhere!)
+    if (interaction.guild && !interaction.channel) {
+        try { await interaction.reply({content: 'Internal error: Could not fetch channel context.', ephemeral:true}); } catch{}
+        return;
+    }
 
 
+    // Defend: prevent errors if interaction.options is not present (Discord lib bug or corruption!)
+    if (interaction.isChatInputCommand && !interaction.options) {
+        try { await interaction.reply({content:'Internal error: Missing options.',ephemeral:true}); } catch {}
+        return;
+    }
 
     // ---- SLASH: POLL ----
     // FIX: Ensure permissions check works in DMs (where .member may be null)
     if (interaction.isChatInputCommand() && interaction.commandName === 'poll') {
+
         if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
             await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
         }
@@ -495,10 +531,13 @@ client.on('interactionCreate', async interaction => {
         setTimeout(async ()=>{
             let p = await db.get('SELECT * FROM poll WHERE messageId=?', cmsg.id);
             if (!p) return;
-            await finishPoll(p, interaction.channel);
+            try {
+                await finishPoll(p, interaction.channel);
+            } catch {}
         }, dur);
         return;
     }
+
 
 
 
@@ -610,6 +649,10 @@ client.on('interactionCreate', async interaction => {
 
     // --- SLASH: NOTE ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'note') {
+        // Restrict all note commands to DM only, except searching/listing/adding maybe (debatable: for privacy)
+        if (interaction.guild) {
+            await interaction.reply({content:"Notes are private, use in DM only.",ephemeral:true}); return;
+        }
         if (interaction.options.getSubcommand() === 'add') {
             const txt = interaction.options.getString('content').substring(0, 500);
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)',
@@ -655,6 +698,7 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
 
 
     // --- SLASH: TODO ---
@@ -1006,24 +1050,28 @@ client.on('messageCreate', async msg => {
     if (msg.guild && msg.channel.id !== CHANNEL_ID) return;
     if (msg.author.bot) return;
 
+    // Ensure no uncaught error due to undefined .channel (legacy partial bug, rare)
+    if (msg.guild && !msg.channel) return;
+
     // STICKY: repost sticky message whenever new message in the allowed channel (don't spam too often)
     if (msg.guild && msg.channel.id === CHANNEL_ID) {
-        let stickyRec = await db.get("SELECT * FROM sticky WHERE channelId=?", CHANNEL_ID);
+        let stickyRec;
+        try { stickyRec = await db.get("SELECT * FROM sticky WHERE channelId=?", CHANNEL_ID); } catch {stickyRec = null;}
         if (stickyRec) {
             if (!client._lastSticky || Date.now() - client._lastSticky > 60000*2) { // 2 minutes anti-spam
                 client._lastSticky = Date.now();
-                let m = await msg.channel.send({
-                    content: `__**Sticky Message**__\n${stickyRec.message}\n*(set by <@${stickyRec.setBy}>)*`
-                });
-                setTimeout(()=> m.delete().catch(()=>{}), 60000*6); // autodelete in 6 min
+                try {
+                    let m = await msg.channel.send({
+                        content: `__**Sticky Message**__\n${stickyRec.message}\n*(set by <@${stickyRec.setBy}>)*`
+                    });
+                    setTimeout(()=> m.delete().catch(()=>{}), 60000*6); // autodelete in 6 min
+                } catch {}
             }
         }
     }
 
-
-    // AUTO-RESPOND FRIEND MODE (fun UX): 
- 
-    if (msg.guild && msg.mentions.has(client.user) && msg.content.length < 80) {
+    // Prevent issues with .mentions missing or client.user missing
+    if (msg.guild && msg.mentions?.has?.(client.user) && msg.content.length < 80) {
         let responses = [
             "Hey there! Want help? Try `/` for commands.",
             "👋 How can I help you today?",
@@ -1045,9 +1093,6 @@ client.on('messageCreate', async msg => {
             await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`,ephemeral:true});
     }
 
-
-
-
     // --- Log all messages for moderation/stats ---
     if (msg.guild) {
         await db.run('INSERT INTO message_logs(userId, username, content, createdAt, guildId, channelId, messageId) VALUES (?,?,?,?,?,?,?)',
@@ -1055,12 +1100,12 @@ client.on('messageCreate', async msg => {
         lastMessageUserCache[msg.author.id] = { username: msg.member?.user?.tag || msg.author.username };
     }
 
-
     // Don't run in DMs except for reminders/notes slash cmds
     // XP, content moderation, games: only in main channel
     if (msg.guild) {
         // XP: 3-10/message, 1 min cooldown unless XP muted for this user (content moderation improvement)
-        const muted = await db.get("SELECT 1 FROM warnings WHERE userId=? AND reason LIKE '%XP MUTE%'", msg.author.id);
+        let muted = null;
+        try { muted = await db.get("SELECT 1 FROM warnings WHERE userId=? AND reason LIKE '%XP MUTE%'", msg.author.id); } catch {}
         if (!muted) {
             const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', msg.author.id) || {xp:0,level:0};
             const lastKey = `lastxp_${msg.author.id}`;
@@ -1077,9 +1122,10 @@ client.on('messageCreate', async msg => {
             }
         }
         // Basic moderation: block bad words, allow config of blocked words in /data/blocked_words.json
-        let dynamicBadWords = await readJSONFile("blocked_words.json", []);
+        let dynamicBadWords = [];
+        try { dynamicBadWords = await readJSONFile("blocked_words.json", []); } catch {}
         let badwords = ['badword1','badword2','fuck','shit','bitch','asshole'].concat(dynamicBadWords);
-        if (badwords.some(w=>msg.content.toLowerCase().includes(w))) {
+        if (badwords.some(w=>msg.content?.toLowerCase().includes(w))) {
             await db.run(
                 'UPDATE message_logs SET deleted=1 WHERE userId=? ORDER BY createdAt DESC LIMIT 1',
                 msg.author.id
@@ -1103,6 +1149,7 @@ client.on('messageCreate', async msg => {
     }
 
 });
+
 
 client.on('interactionCreate', async interaction => {
     // UX: Save code as note (from message button)
