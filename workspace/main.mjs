@@ -455,6 +455,11 @@ const commands = [
         name: "rollhist",
         description: "Show your recent dice roll history"
     },
+    {
+        name: "rollstats",
+        description: "Show leaderboard and fun stats for dice rolls"
+    },
+
 
     {
         name: "coinflip",
@@ -1155,6 +1160,70 @@ return;
         }
         return;
     }
+
+    // --- SLASH: ROLLHIST ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "rollhist") {
+        try {
+            let hist = [];
+            try { hist = await readJSONFile("roll_history.json", []); } catch {}
+            hist = hist.filter(r => r.userId === interaction.user.id).slice(-10).reverse();
+            if (!hist.length) return void interaction.reply({content:"No dice roll history found."});
+            let lines = hist.map((h,i) => `**${i+1}.** \`${h.formula}\` = ${h.resultMsg} _(at <t:${Math.floor(h.at/1000)}:t>)_`);
+            let embed = new EmbedBuilder()
+                .setTitle(`${interaction.user.tag}'s Last ${hist.length} Dice Rolls`)
+                .setDescription(lines.join("\n"))
+                .setColor(0x7dd3fc);
+            await interaction.reply({embeds:[embed]});
+        } catch (e) {
+            await interaction.reply({content:"Failed to show roll history."});
+        }
+        return;
+    }
+
+    // --- SLASH: ROLLSTATS ---
+    if (interaction.isChatInputCommand && interaction.commandName === "rollstats") {
+        try {
+            let histAll = [];
+            try { histAll = await readJSONFile("roll_history.json", []); } catch {}
+            if (!histAll.length) return void interaction.reply({content:"No roll stats yet!"});
+            // Compute: who rolled the highest total; who rolled most; average roll per user (by sum of totals/number)
+            let stats = {}, users = {};
+            for (let r of histAll) {
+                stats[r.userId] = stats[r.userId] || {count:0, sum:0, top:0, name:r.userId};
+                stats[r.userId].count++;
+                stats[r.userId].sum += r.sum;
+                if (r.sum > stats[r.userId].top) stats[r.userId].top = r.sum;
+                users[r.userId] = true;
+            }
+            let userTags = {};
+            try {
+                for (let uid of Object.keys(users)) {
+                    let u = await client.users.fetch(uid);
+                    userTags[uid] = u.tag;
+                    stats[uid].name = u.tag;
+                }
+            } catch {}
+            // Top user by volume
+            let sorted = Object.values(stats).sort((a, b) => b.count - a.count);
+            let leaderboard = sorted.slice(0, 5).map((u, i) =>
+                `**#${i+1} ${u.name||u.userId}** - ${u.count} rolls, avg total: ${u.count?Math.round(u.sum/u.count):0}, best: ${u.top}`
+            );
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🎲 Dice Game Leaderboard & Stats")
+                        .setDescription(
+                            "Most Active Rollers:\n"
+                            + leaderboard.join('\n')
+                        ).setColor(0xd1fae5)
+                ]
+            });
+        } catch (e) {
+            await interaction.reply({content:"Failed to compute roll stats."});
+        }
+        return;
+    }
+
 
 
     // --- SLASH: COINFLIP ---
