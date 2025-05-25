@@ -277,7 +277,7 @@ client.on('interactionCreate', async interaction => {
         const rows = await db.all('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT 10');
         if (!rows.length) return void interaction.reply({content:"Leaderboard empty.",ephemeral:true});
         let msg = rows.map((r,i)=>`**#${i+1}: <@${r.userId}> — Level ${r.level} (${r.xp} XP)**`).join('\n');
-        await interaction.reply({content:msg,ephemeral:false});
+        await interaction.reply({content:msg,ephemeral:false, allowedMentions: { users: [] }});
         return;
     }
     // --- SLASH: 8BALL ---
