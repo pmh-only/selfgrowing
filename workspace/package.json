@@ -1,7 +1,6 @@
 {
-  "name": "discord-single-file-bot",
+  "name": "discordjs-private-bot",
   "version": "1.0.0",
-  "description": "A large scale Discord.js bot using a single main.mjs file. Features: public notes, to-do, reminders, polls, content moderation, games, and more.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {

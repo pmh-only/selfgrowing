@@ -69,10 +69,17 @@ async function migratePinnedToTodo() {
     }
 }
 // SQLite DB setup
-const db = await open({
-    filename: DATA_DIR + 'botdata.db',
-    driver: sqlite3.Database
-});
+let db;
+try {
+    db = await open({
+        filename: DATA_DIR + 'botdata.db',
+        driver: sqlite3.Database
+    });
+} catch (e) {
+    console.error("Failed to open SQLite DB!", e);
+    process.exit(1);
+}
+
 await db.run(`CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,
@@ -568,23 +575,31 @@ client.on('interactionCreate', async interaction => {
         client._activePolls = client._activePolls || {};
         client._activePolls[cmsg.id] = { opts, end: Date.now()+dur };
 
-        const cmsg = await interaction.reply({ embeds: [embed], components:[row], fetchReply:true });
-        await db.run(`
-            INSERT INTO poll(title, options, creatorId, channelId, messageId, votes, expiresAt)
-            VALUES (?,?,?,?,?,?,?)
-        `, title, JSON.stringify(opts), interaction.user.id, interaction.channel.id, cmsg.id, '{}', Date.now()+dur);
-        setTimeout(async ()=>{
-            let p = await db.get('SELECT * FROM poll WHERE messageId=?', cmsg.id);
-            if (!p) return;
-            // Remove from in-memory _activePolls
-            if (client._activePolls) delete client._activePolls[cmsg.id];
-            try {
-                await finishPoll(p, interaction.channel);
-            } catch {}
-        }, dur);
-        return;
+        let cmsg = null;
+try {
+    cmsg = await interaction.reply({ embeds: [embed], components:[row], fetchReply:true });
+} catch (e) {
+    await interaction.reply({content: 'Failed to post poll. Please try again.'});
+    return;
+}
+await db.run(`
+    INSERT INTO poll(title, options, creatorId, channelId, messageId, votes, expiresAt)
+    VALUES (?,?,?,?,?,?,?)
+`, title, JSON.stringify(opts), interaction.user.id, interaction.channel.id, cmsg.id, '{}', Date.now()+dur);
+setTimeout(async ()=>{
+    let p;
+    try { p = await db.get('SELECT * FROM poll WHERE messageId=?', cmsg.id); } catch { p = null; }
+    if (!p) return;
+    // Remove from in-memory _activePolls
+    if (client._activePolls) delete client._activePolls[cmsg.id];
+    try {
+        await finishPoll(p, interaction.channel);
+    } catch {}
+}, dur);
+return;
 
-    }
+}
+
 
 
 
@@ -1123,6 +1138,20 @@ client.on('interactionCreate', async interaction => {
 
 
 let lastMessageUserCache = {};
+
+// Defensive: ensure db schema for snipe is robust
+(async ()=>{
+    try {
+        await db.run(`ALTER TABLE message_logs ADD COLUMN messageId TEXT`);
+    } catch {}
+    try {
+        await db.run(`ALTER TABLE message_logs ADD COLUMN channelId TEXT`);
+    } catch {}
+    try {
+        await db.run(`ALTER TABLE message_logs ADD COLUMN guildId TEXT`);
+    } catch {}
+})();
+
 
 // ---- SLASH: STICKY (moved here for single on-interaction handler) ----
 client.on('interactionCreate', async interaction => {
