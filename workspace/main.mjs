@@ -146,8 +146,10 @@ await db.run(`CREATE TABLE IF NOT EXISTS suggestion (
     suggestion TEXT NOT NULL,
     createdAt INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
-    votes INTEGER NOT NULL DEFAULT 0
+    votes INTEGER NOT NULL DEFAULT 0,
+    handled INTEGER NOT NULL DEFAULT 0 -- ADDED FIELD: track "handled" suggestions
 )`);
+
 await db.run(`CREATE TABLE IF NOT EXISTS user_tags (
     userId TEXT PRIMARY KEY,
     tag TEXT NOT NULL,
@@ -1260,7 +1262,7 @@ return;
         return;
     }
     if (interaction.isChatInputCommand() && interaction.commandName === "suggestions") {
-        // List active (not rejected/closed) suggestions, most recent at top
+        // List all open suggestions, mark those handled with [HANDLED], UX improvement
         let recs = await db.all(
             "SELECT * FROM suggestion WHERE status='pending' OR status='approved' ORDER BY createdAt DESC LIMIT 10"
         );
@@ -1268,7 +1270,6 @@ return;
             await interaction.reply({content: "No suggestions yet! Use `/suggest` to add one."});
             return;
         }
-        // For each, show upvote/downvote counts (reaction-style voting)
         let entries = [];
         for (let s of recs) {
             // Count votes as reactions (reuse reactions table by suggest_id)
@@ -1280,23 +1281,43 @@ return;
                 down: (down[0]?.n || 0)
             });
         }
-        // Render an embed for each suggestion
         let embeds = entries.map((s, idx) =>
             new EmbedBuilder()
-                .setTitle(`Suggestion #${s.id}`)
+                .setTitle(`${s.handled ? "✅ [HANDLED]" : ""} Suggestion #${s.id}`)
                 .setDescription([
                     `> ${s.suggestion}`,
                     `By: <@${s.userId}>`,
-                    `Status: \`${s.status}\``,
+                    `Status: \`${s.status}\`${s.handled ? " (Marked as handled)" : ""}`,
                     `👍 ${s.up} | 👎 ${s.down}`
                 ].join("\n"))
-                .setColor(0xf9a825)
+                .setColor(s.handled ? 0x34d399 : 0xf9a825)
                 .setFooter({ text: `Use /suggest to add your own!` })
                 .setTimestamp(s.createdAt)
         );
-        await interaction.reply({embeds: embeds.slice(0,3)}); // Show up to 3 embeds, avoid spam
+        await interaction.reply({embeds: embeds.slice(0,3)});
         return;
     }
+
+    // --- SLASH: SUGGESTHANDLE ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'suggesthandle') {
+        // No permissions needed per restrictions
+        let sid = interaction.options.getInteger('suggestion_id');
+        let stat = interaction.options.getString('status');
+        let validStatus = ["approved", "rejected", "handled"];
+        if (!sid || !stat || !validStatus.includes(stat)) {
+            await interaction.reply({content:"Invalid suggestion ID or status."});
+            return;
+        }
+        let row = await db.get("SELECT * FROM suggestion WHERE id=?", sid);
+        if (!row) {
+            await interaction.reply({content:"No such suggestion."});
+            return;
+        }
+        await db.run("UPDATE suggestion SET status=?, handled=1 WHERE id=?", stat, sid);
+        await interaction.reply({content: `Suggestion #${sid} marked as **${stat}** (Handled).`});
+        return;
+    }
+
     // --- UX improvement: Quick Roll Button (+data persistence; show leaderboard) ---
     if (interaction.isChatInputCommand() && interaction.commandName === "roll") {
         try {
@@ -1913,6 +1934,7 @@ client.on('messageCreate', async msg => {
         /^quickroll_(d6|d20)/.test(interaction.customId) ||
         /^roll_leaderboard$/.test(interaction.customId)
     )) {
+
         if (/^roll_leaderboard$/.test(interaction.customId)) {
             // Re-use /rollstats logic, but as embed here!
             try {
@@ -2474,6 +2496,17 @@ client.on('interactionCreate', async interaction => {
 
 
 
+/**
+ * Migration: add "handled" column to suggestion if missing (for deployments with pre-existing data)
+ */
+try {
+    const cols = await db.all("PRAGMA table_info('suggestion')");
+    if (!cols.some(c => c.name === "handled")) {
+        await db.run("ALTER TABLE suggestion ADD COLUMN handled INTEGER NOT NULL DEFAULT 0");
+    }
+} catch {}
+
+
 // --- Startup reminder boot ---
 // Show top 5 most upvoted messages feature
 client.once('ready', () => {
@@ -2487,6 +2520,7 @@ client.once('ready', () => {
         name: "slash commands! (/help)"
     });
 });
+
 
 
 client.on('messageDelete', async msg => {
