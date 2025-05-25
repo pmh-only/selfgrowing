@@ -144,20 +144,6 @@ await db.run(`CREATE TABLE IF NOT EXISTS warnings (
     timestamp INTEGER NOT NULL
 )`);
 
-// migrate pinned_notes -> todo_entries (one-time, idempotent)
-async function migratePinnedToTodo() {
-    const pinned = await db.all("SELECT * FROM pinned_notes");
-    if (!pinned.length) return;
-    const existing = await db.get(`SELECT COUNT(*) as n FROM todo_entries`);
-    if (existing.n>0) return;
-    for (const p of pinned) {
-        const note = await db.get("SELECT note, timestamp FROM notes WHERE id=?", p.noteId);
-        if (!note) continue;
-        await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", p.ownerId, note.note, note.timestamp);
-    }
-    await db.run("DROP TABLE IF EXISTS pinned_notes");
-}
-await migratePinnedToTodo();
 
 await db.run(`CREATE TABLE IF NOT EXISTS xp (
     userId TEXT PRIMARY KEY,
