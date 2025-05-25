@@ -30,6 +30,16 @@ await db.run(`CREATE TABLE IF NOT EXISTS notes (
     timestamp INTEGER NOT NULL,
     pinned INTEGER NOT NULL DEFAULT 0
 )`);
+await db.run(`CREATE TABLE IF NOT EXISTS poll (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    options TEXT NOT NULL,
+    creatorId TEXT NOT NULL,
+    channelId TEXT NOT NULL,
+    messageId TEXT,
+    votes TEXT NOT NULL DEFAULT '{}',
+    expiresAt INTEGER
+)`);
 await db.run(`CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,

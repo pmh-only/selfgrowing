@@ -1,20 +1,18 @@
 {
-  "name": "private-discord-bot",
+  "name": "discord-private-bot",
   "version": "1.0.0",
+  "description": "A large-scale private Discord bot with admin tools, reminders, polls, moderation, and fun commands. Supports SQLite persistence in /data/.",
   "type": "module",
-  "description": "A private Discord bot with notes, reminders, moderation, and XP features.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
-  "dependencies": {
-    "discord.js": "^14.13.0",
-    "sqlite3": "^5.1.6",
-    "sqlite": "^4.2.1"
-  },
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "",
-  "license": "MIT"
+  "dependencies": {
+    "discord.js": "^14.13.0",
+    "sqlite": "^4.2.1",
+    "sqlite3": "^5.1.6"
+  }
 }
