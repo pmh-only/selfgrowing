@@ -1,3 +1,6 @@
 write a full content of package.json for success to run this application.
 don't use previous replace format. just print entire content of package.json
 6. OUTPUT only string (do not use code block and explanation, confirmation message)
+
+CONSTRAINS:
+* sqlite's latest version is 5.1.1

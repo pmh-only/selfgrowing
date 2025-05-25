@@ -15,6 +15,11 @@ features can be anything such as but not limited:
 * user tools
 * etc...
 
+errors can be anything such as but not limited:
+* syntax error
+* bracket not matching
+* undefined handling
+
 always remember following restrictions:
 * the main.mjs file support "import" based module loading. do not use "require" based 
 * this discord bot doens't have ban or kick permission. other permissions are granted
