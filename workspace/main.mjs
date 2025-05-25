@@ -36,7 +36,23 @@ async function finishPoll(pollRec, chan) {
                 .setColor(0x8B5CFF)
             ],
             components: []
-        });
+        // --- SLASH: PURGEWARNINGS ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'purgewarnings') {
+        const tgt = interaction.options.getUser('user');
+        if (!tgt) {
+            await interaction.reply({content: "You must select a user!"});
+            return;
+        }
+        const existed = await db.get("SELECT COUNT(*) as n FROM warnings WHERE userId=?", tgt.id);
+        if (!existed || !existed.n) {
+            await interaction.reply({content:"No warnings found to purge for that user."}); return;
+        }
+        await db.run("DELETE FROM warnings WHERE userId=?", tgt.id);
+        await interaction.reply({content:`✅ All warnings for <@${tgt.id}> have been removed.`});
+        return;
+    }
+});
+
         // Remove poll from db
         await db.run("DELETE FROM poll WHERE id=?", pollRec.id);
     } catch {}
