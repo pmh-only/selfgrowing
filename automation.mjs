@@ -30,13 +30,14 @@ const source_response = await client.responses.create({
 })
 
 await changelog.send(new Date() + ' finished: ' + source_response.output_text.length + ' characters')
+const changes = source_response.output_text.split('<<<<<<< ORIGINAL').slice(1).map((v) => v.split('=======').map((v) => v.trim().replace('>>>>>>> UPDATED', '')))
 
-const requested_original = source_response.output_text.split('=======')[0].split('<<<<<<< ORIGINAL')[1].trim()
-const requested_updated = source_response.output_text.split('=======')[1].split('>>>>>>> UPDATED')[0].trim()
+let source = original_source
 
-const modified_source = original_source.replace(requested_original, requested_updated)
+for (const [original, updated] of changes) 
+  source = source.replace(original, updated)
 
-fs.writeFileSync('./workspace/main.mjs', modified_source)
+fs.writeFileSync('./workspace/main.mjs', source)
 
 const package_response = await client.responses.create({
   model: 'gpt-4.1',
