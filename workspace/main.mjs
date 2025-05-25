@@ -696,50 +696,51 @@ client.on('interactionCreate', async interaction => {
 
     // --- SLASH: NOTE ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'note') {
-        // Restrict all note commands to DM only, except searching/listing/adding maybe (debatable: for privacy)
-        if (interaction.guild) {
-            await interaction.reply({content:"Notes are private, use in DM only.",ephemeral:true}); return;
+        // Restrict all note commands to PUBLIC main channel (fix restriction: DM not allowed)
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({content:"Notes are public, use in the main channel.",ephemeral:false}); return;
         }
         if (interaction.options.getSubcommand() === 'add') {
             const txt = interaction.options.getString('content').substring(0, 500);
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)',
                 interaction.user.id, txt, Date.now());
-            await interaction.reply({content:'📝 Note saved (DM only)!'});
+            await interaction.reply({content:'📝 Note saved! (All notes are public in-channel; use `/todo` for personal items)'});
         } else if (interaction.options.getSubcommand() === 'list') {
-            const rows = await db.all('SELECT id, note, timestamp FROM notes WHERE userId=? ORDER BY id DESC LIMIT 10', interaction.user.id);
+            const rows = await db.all('SELECT id, note, timestamp, userId FROM notes ORDER BY id DESC LIMIT 10');
             if (rows.length === 0) await interaction.reply({content:"No notes yet."});
             else {
                 const embed = new EmbedBuilder()
-                  .setTitle("Your last 10 notes")
-                  .setDescription(rows.map((r,i) => `**[${rows.length-i}]** ${r.note} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
+                  .setTitle("Last 10 Public Notes")
+                  .setDescription(rows.map((r,i) => `**[${rows.length-i}]** <@${r.userId}>: ${r.note} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
                   .setColor(0x80ecec);
                 await interaction.reply({embeds:[embed]});
             }
         } else if (interaction.options.getSubcommand() === 'delete') {
             const idx = interaction.options.getInteger('number');
-            const allRows = await db.all('SELECT id FROM notes WHERE userId=? ORDER BY id DESC LIMIT 10', interaction.user.id);
+            const allRows = await db.all('SELECT id, userId FROM notes ORDER BY id DESC LIMIT 10');
             if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!"});
+            // Allow any user to delete any note for public UX (demonstration mode)
             await db.run('DELETE FROM notes WHERE id=?', allRows[idx-1].id);
             await interaction.reply({content:"🗑️ Note deleted."});
         } else if (interaction.options.getSubcommand() === "pin") {
-            await interaction.reply({content:"⚠️ To pin notes, please use `/todo add` with the note content!"});
+            await interaction.reply({content:"⚠️ To pin notes, please use `/todo add` with the note content! (To-Do is now public)"});
         } else if (interaction.options.getSubcommand() === "pinned") {
-            const todos = await db.all("SELECT content, done, ts FROM todo_entries WHERE userId=? ORDER BY ts DESC", interaction.user.id);
+            const todos = await db.all("SELECT content, done, ts, userId FROM todo_entries ORDER BY ts DESC");
             if (!todos.length)
-                return void interaction.reply({content:"No pinned notes (your pinned notes are now found in `/todo list` as your To-Do list)."});
+                return void interaction.reply({content:"No pinned notes (all pinned notes are now in `/todo list` as the To-Do list, public to all)."});
             const embed = new EmbedBuilder()
-                .setTitle("📝 Your Pinned Notes (To-Do List)")
-                .setDescription(todos.slice(0,10).map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
+                .setTitle("📝 Pinned Notes (Public To-Do List)")
+                .setDescription(todos.slice(0,10).map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** <@${t.userId}>: ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
                 .setColor(0xfecf6a);
             await interaction.reply({embeds:[embed]});
         } else if (interaction.options.getSubcommand() === "search") {
             const query = interaction.options.getString("query").toLowerCase();
-            const rows = await db.all('SELECT note, timestamp FROM notes WHERE userId=? ORDER BY id DESC LIMIT 50', interaction.user.id);
+            const rows = await db.all('SELECT note, timestamp, userId FROM notes ORDER BY id DESC LIMIT 50');
             const matches = rows.filter(r => r.note.toLowerCase().includes(query));
             if (!matches.length) return void interaction.reply({content:`No matching notes found for "${query}".`});
             const embed = new EmbedBuilder()
                 .setTitle(`🔎 Notes matching "${query}"`)
-                .setDescription(matches.slice(0,10).map((n,i)=>`**[${i+1}]** ${n.note} _(at <t:${Math.floor(n.timestamp/1000)}:f>)_`).join("\n"))
+                .setDescription(matches.slice(0,10).map((n,i)=>`**[${i+1}]** <@${n.userId}>: ${n.note} _(at <t:${Math.floor(n.timestamp/1000)}:f>)_`).join("\n"))
                 .setColor(0x4a90e2);
             await interaction.reply({embeds:[embed]});
         }
@@ -749,16 +750,18 @@ client.on('interactionCreate', async interaction => {
 
 
 
+
     // --- SLASH: TODO ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'todo') {
-        if (interaction.guild) {
-            await interaction.reply({content:"For privacy, use To-Do in DM only.", ephemeral:true}); return;
+        // Only allow in main channel, everywhere public (privacy restriction removed)
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({content:"To-dos are now public, use in the main channel!", ephemeral:false}); return;
         }
         const sub = interaction.options.getSubcommand();
         if (sub === "add") {
             let txt = interaction.options.getString("content").substring(0,300);
             // Suggest related incomplete todos by fuzzy match if available! (UX improvement)
-            let fuzzyMatch = (await db.all("SELECT content FROM todo_entries WHERE userId=? AND done=0", interaction.user.id))
+            let fuzzyMatch = (await db.all("SELECT content FROM todo_entries WHERE done=0"))
               .filter(i=>i.content.toLowerCase().includes(txt.slice(0,4).toLowerCase()))
               .map(i=>i.content);
             let addMsg = "📝 To-do added!";
@@ -768,22 +771,22 @@ client.on('interactionCreate', async interaction => {
             await interaction.reply({content:addMsg});
         } else if (sub === "complete") {
             let idx = interaction.options.getInteger('number');
-            let rows = await db.all("SELECT id, content FROM todo_entries WHERE userId=? ORDER BY ts DESC LIMIT 15", interaction.user.id);
+            let rows = await db.all("SELECT id, content FROM todo_entries ORDER BY ts DESC LIMIT 15");
             if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
             await db.run("UPDATE todo_entries SET done=1 WHERE id=?", rows[idx-1].id);
             await interaction.reply({content:`✅ Marked "${rows[idx-1].content}" as done.`});
         } else if (sub === "remove") {
             let idx = interaction.options.getInteger('number');
-            let rows = await db.all("SELECT id FROM todo_entries WHERE userId=? ORDER BY ts DESC LIMIT 15", interaction.user.id);
+            let rows = await db.all("SELECT id FROM todo_entries ORDER BY ts DESC LIMIT 15");
             if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
             await db.run("DELETE FROM todo_entries WHERE id=?", rows[idx-1].id);
             await interaction.reply({content:"🗑️ To-do removed."});
         } else if (sub === "list") {
-            let todos = await db.all("SELECT content, done, ts FROM todo_entries WHERE userId=? ORDER BY ts DESC", interaction.user.id);
-            if (!todos.length) return void interaction.reply({content:"Your to-do list is empty!"});
+            let todos = await db.all("SELECT content, done, ts, userId FROM todo_entries ORDER BY ts DESC");
+            if (!todos.length) return void interaction.reply({content:"To-do list is empty!"});
             let embed = new EmbedBuilder()
-                .setTitle("📝 Your To-Do List")
-                .setDescription(todos.map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
+                .setTitle("📝 Public To-Do List")
+                .setDescription(todos.map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** <@${t.userId}>: ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
                 .setColor(0xfcc063);
 
             // New UX: count completed and incomplete
@@ -793,6 +796,7 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
 
 
 
@@ -1240,14 +1244,15 @@ client.on('interactionCreate', async interaction => {
             let msg = await chan.messages.fetch(mid);
             // Extract first code block, save as note
             let code = (msg.content.match(/```(?:\w+\n)?([\s\S]+?)```/)||[])[1]?.trim() || msg.content.trim();
-            if (!code) return void interaction.reply({content:"Couldn't find code.", ephemeral:true});
+            if (!code) return void interaction.reply({content:"Couldn't find code.", ephemeral:false});
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)', interaction.user.id, code.substring(0,500), Date.now());
-            await interaction.reply({content:"✅ Code saved as private note (in `/note list` in DM)."});
+            await interaction.reply({content:"✅ Code saved as note (in `/note list`, public)."});
         } catch(e) {
             await interaction.reply({content:"Could not save code."});
         }
         return;
     }
+
 
     // POLL VOTING BUTTON HANDLING (fix: check for expired/missing poll, UX improvement)
     if (interaction.isButton() && (/^vote_(\d)$/).test(interaction.customId) || interaction.customId==="vote_retract") {
@@ -1310,10 +1315,11 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isMessageContextMenuCommand?.() && interaction.commandName === "Add To-Do") {
         let msg = interaction.targetMessage;
         await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", interaction.user.id, msg.content.substring(0,300), Date.now());
-        await interaction.reply({content:"Added message as a to-do in your DM. Use /todo list!"});
+        await interaction.reply({content:"Added message as a to-do in the public To-Do list. Use `/todo list` to view!"});
         return;
     }
 });
+
 
 
 
@@ -1353,7 +1359,13 @@ const welcomeButtonRow = new ActionRowBuilder().addComponents(
         .setStyle(ButtonStyle.Success)
 );
 
+// Handle uncaught exceptions to prevent crash
+process.on("uncaughtException", err => {
+    console.error("Uncaught Exception:", err);
+});
+
 // Listen for admin command: update blocklist dynamically (moderation tool, slash command)
+
 client.on('interactionCreate', async interaction => {
     // FIX: Guard .member on permission checks for admin DM/system
     if (
