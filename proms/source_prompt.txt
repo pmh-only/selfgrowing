@@ -17,7 +17,10 @@ errors can be anything such as but not limited:
 * syntax error
 * bracket not matching
 * undefined handling
-* tables are not exist
+* logical errors like
+  * missing command registration
+  * tables are not exist
+* etc... 
 
 always remember following restrictions:
 * the main.mjs file support "import" based module loading. do not use "require" based 

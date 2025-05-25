@@ -1,2 +1,4 @@
 write a commit message for your main.mjs changes in one line.
 6. OUTPUT only this string (do not use code block and explanation, confirmation message)
+
+commit message must be comfort "Conventional Commits". use prefix like "feat: ", "fix: ", "refactor: " etc...
