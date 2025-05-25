@@ -23,6 +23,17 @@ async function ensureDataDir() {
             await interaction.reply({content:"This poll has ended!", ephemeral:true});
             return;
         }
+        if (interaction.customId === "vote_retract") {
+            let votes = {};
+            try { votes = JSON.parse(pollRecord.votes || "{}"); } catch {}
+            if (!votes[interaction.user.id] && votes[interaction.user.id]!==0) {
+                await interaction.reply({content:"You haven't voted yet.", ephemeral:true}); return;
+            }
+            delete votes[interaction.user.id];
+            await db.run("UPDATE poll SET votes=? WHERE messageId=?", JSON.stringify(votes), interaction.message.id);
+            await interaction.reply({content:"Your vote has been retracted.", ephemeral:true});
+            return;
+        }
         const optionIdx = parseInt(interaction.customId.split("_")[1]);
         let votes = {};
         try { votes = JSON.parse(pollRecord.votes || "{}"); } catch {}
@@ -53,6 +64,7 @@ async function ensureDataDir() {
         // Quick UX: acknowledge on button, don't update base poll message (other than at end)
         return;
     }
+
 });
 
 // ------- Helper: End poll and show results ---------
@@ -113,12 +125,14 @@ await db.run(`CREATE TABLE IF NOT EXISTS message_logs (
     createdAt INTEGER NOT NULL,
     deleted INTEGER NOT NULL DEFAULT 0
 )`);
-await db.run(`CREATE TABLE IF NOT EXISTS pinned_notes (
+await db.run(`CREATE TABLE IF NOT EXISTS todo_entries (
     id INTEGER PRIMARY KEY,
-    ownerId TEXT NOT NULL,
-    noteId INTEGER NOT NULL,
-    UNIQUE(ownerId, noteId)
+    userId TEXT NOT NULL,
+    content TEXT NOT NULL,
+    done INTEGER NOT NULL DEFAULT 0,
+    ts INTEGER
 )`);
+
 await db.run(`CREATE TABLE IF NOT EXISTS timers (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,
@@ -142,6 +156,22 @@ await db.run(`CREATE TABLE IF NOT EXISTS warnings (
     reason TEXT NOT NULL,
     timestamp INTEGER NOT NULL
 )`);
+
+// migrate pinned_notes -> todo_entries (one-time, idempotent)
+async function migratePinnedToTodo() {
+    const pinned = await db.all("SELECT * FROM pinned_notes");
+    if (!pinned.length) return;
+    const existing = await db.get(`SELECT COUNT(*) as n FROM todo_entries`);
+    if (existing.n>0) return;
+    for (const p of pinned) {
+        const note = await db.get("SELECT note, timestamp FROM notes WHERE id=?", p.noteId);
+        if (!note) continue;
+        await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", p.ownerId, note.note, note.timestamp);
+    }
+    await db.run("DROP TABLE IF EXISTS pinned_notes");
+}
+await migratePinnedToTodo();
+
 await db.run(`CREATE TABLE IF NOT EXISTS xp (
     userId TEXT PRIMARY KEY,
     xp INTEGER NOT NULL DEFAULT 0,
@@ -182,8 +212,23 @@ const client = new Client({
 // --- Login ---
 await client.login(TOKEN);
 
+/*
+New UX/features added in this SEARCH/REPLACE update:
+- /todo: private to-do list manager (submenu add, complete, remove, list)
+- Cooldown on /purge for safety, visual confirm button before delete.
+- /quote now allows tagging a category with a modal, /quotes can filter by it.
+- Poll: allow user to retract vote
+- /dmuser (admin only): DM a user with a message (helpful for reaching out privately)
+- Properly migrate pinned_notes table from pinned_notes(ownerId,noteId) to todo_entries(userId, content, done, ts), if needed.
+- Show a welcome embed in DM with a persistent "Get Started" button for onboarding.
+- /xp: level-up history with timestamps available.
+*/
+
+import path from 'path';
+
 // --- Slash commands registration ---
 const commands = [
+
     {
         name: 'note',
         description: 'Add/view/delete personal notes privately.',
@@ -215,6 +260,32 @@ const commands = [
         name: "pollresults",
         description: "Show active poll results"
     },
+    {
+        name: "todo",
+        description: "Personal to-do list, only in DM",
+        options: [
+            { name:'add',type:1, description:"Add a new to-do", options:[
+              { name:'content', type:3, description:"To-do description", required:true }
+            ]},
+            { name:'complete', type:1, description:"Mark a to-do as completed", options:[
+                { name: 'number', type:4, description:"To-do item number", required:true }
+            ]},
+            { name:'remove', type:1, description:"Delete a to-do item", options:[
+                { name: 'number', type:4, description:"To-do item number", required:true }
+            ]},
+            { name:'list', type:1, description:"List your current to-dos" }
+        ]
+    },
+    {
+        name: "dmuser",
+        description: "Send a DM to a user (admin only)",
+        default_member_permissions: (PermissionFlagsBits.ManageMessages).toString(),
+        options:[
+            { name:'user',type:6,description:'User',required:true},
+            { name:'message', type:3, description:'Message content', required:true }
+        ]
+    }
+
     {
         name: "avatar",
         description: "Show your or another user's avatar",
@@ -415,7 +486,7 @@ client.on('interactionCreate', async interaction => {
         const row = new ActionRowBuilder().addComponents(
             opts.map((_,i)=>
                 new ButtonBuilder().setCustomId(`vote_${i}`).setLabel(String.fromCharCode(65+i)).setStyle(ButtonStyle.Primary)
-            )
+            ).concat(new ButtonBuilder().setCustomId('vote_retract').setLabel('Retract Vote').setStyle(ButtonStyle.Secondary))
         );
         const cmsg = await interaction.reply({ embeds: [embed], components:[row], fetchReply:true });
         await db.run(`
@@ -429,6 +500,7 @@ client.on('interactionCreate', async interaction => {
         }, dur);
         return;
     }
+
 
     // -- SLASH: POLLRESULTS --
     if (interaction.isChatInputCommand() && interaction.commandName === "pollresults") {
@@ -463,7 +535,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // --- SLASH: QUOTE (admin) ---
+    // --- SLASH: QUOTE (admin, with category modal) ---
     if (interaction.isChatInputCommand() && interaction.commandName === "quote") {
         if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
             await interaction.reply({content:"You lack perms.", ephemeral:true});
@@ -476,36 +548,62 @@ client.on('interactionCreate', async interaction => {
         try {
             const chan = await client.channels.fetch(chanid);
             const msg = await chan.messages.fetch(msgid);
-            let quotes = await readJSONFile("quotes.json", []);
-            quotes.push({
-                user: {id: msg.author.id, tag: msg.author.tag },
-                content: msg.content,
-                timestamp: msg.createdTimestamp
+            // Prompt for category/tag using modal
+            const modal = new ModalBuilder()
+                .setTitle('Save Quote')
+                .setCustomId('quote_category_modal')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                        .setCustomId('category')
+                        .setLabel('Category/Tag for this quote (optional)')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(false)
+                    )
+                );
+            client._quoteTemp = {msg}; // store temp
+            await interaction.showModal(modal);
+
+            client.once('interactionCreate', async modalInter => {
+                if (!modalInter.isModalSubmit() || modalInter.customId!=='quote_category_modal') return;
+                let cat = modalInter.fields.getTextInputValue('category');
+                let quotes = await readJSONFile("quotes.json", []);
+                quotes.push({
+                    user: {id: msg.author.id, tag: msg.author.tag },
+                    content: msg.content,
+                    timestamp: msg.createdTimestamp,
+                    category: cat||undefined
+                });
+                await saveJSONFile("quotes.json", quotes);
+                await modalInter.reply({content:`✅ Quote saved${cat?` under \`${cat}\``:""}:\n> "${msg.content}" — ${msg.author.tag}`,ephemeral:true});
             });
-            await saveJSONFile("quotes.json", quotes);
-            await interaction.reply({content:`✅ Quote saved:\n> "${msg.content}" — ${msg.author.tag}`,ephemeral:true});
         } catch(e) {
             await interaction.reply({content:"Could not fetch message.",ephemeral:true});
         }
         return;
     }
 
-    // --- SLASH: QUOTES (random) ---
+    // --- SLASH: QUOTES (random, filter by tag) ---
     if (interaction.isChatInputCommand() && interaction.commandName === "quotes") {
         const quotes = await readJSONFile("quotes.json", []);
         if (!quotes.length) return void interaction.reply({content:"No quotes saved.",ephemeral:true});
-        const q = quotes[Math.floor(Math.random()*quotes.length)];
+        // If user types something like "/quotes category=tag" use it
+        let txt = interaction.options? interaction.options.getString?.('category') : undefined;
+        let show = quotes;
+        if (txt) show = quotes.filter(q=>q.category && q.category.toLowerCase().includes(txt.toLowerCase()));
+        const q = show[Math.floor(Math.random()*show.length)];
+        if (!q) return void interaction.reply({content:"No quotes matching that tag!",ephemeral:true});
         const embed = new EmbedBuilder()
             .setTitle("💬 Saved Quote")
             .setDescription(`"${q.content}"`)
-            .setFooter({text: `By ${q.user.tag} at <t:${Math.floor(q.timestamp/1000)}:f>`});
+            .setFooter({text: `By ${q.user.tag} at <t:${Math.floor(q.timestamp/1000)}:f>${q.category?` | #${q.category}`:""}`});
         await interaction.reply({embeds:[embed],ephemeral:false});
         return;
     }
 
+
     // --- SLASH: NOTE ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'note') {
-
         if (interaction.options.getSubcommand() === 'add') {
             const txt = interaction.options.getString('content').substring(0, 500);
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)',
@@ -528,22 +626,15 @@ client.on('interactionCreate', async interaction => {
             await db.run('DELETE FROM notes WHERE id=?', allRows[idx-1].id);
             await interaction.reply({content:"🗑️ Note deleted.", ephemeral:true});
         } else if (interaction.options.getSubcommand() === "pin") {
-            const idx = interaction.options.getInteger('number');
-            const allRows = await db.all('SELECT id FROM notes WHERE userId=? ORDER BY id DESC LIMIT 10', interaction.user.id);
-            if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!", ephemeral:true});
-            await db.run('INSERT OR IGNORE INTO pinned_notes(ownerId, noteId) VALUES (?, ?)', interaction.user.id, allRows[idx-1].id);
-            await interaction.reply({content:"📌 Note pinned!", ephemeral:true});
+            await interaction.reply({content:"⚠️ To pin notes, please use `/todo add` with the note content!", ephemeral:true});
         } else if (interaction.options.getSubcommand() === "pinned") {
-            const noteIds = await db.all('SELECT noteId FROM pinned_notes WHERE ownerId=?', interaction.user.id);
-            if (noteIds.length === 0) return void interaction.reply({content:"No pinned notes.", ephemeral:true});
-            const notes = await db.all(
-                'SELECT note, timestamp FROM notes WHERE id IN ('+ noteIds.map(()=>"?").join(',') +')', ...noteIds.map(r=>r.noteId)
-            );
-            if (!notes.length) return void interaction.reply({content:"No pinned notes.", ephemeral:true});
+            const todos = await db.all("SELECT content, done, ts FROM todo_entries WHERE userId=? ORDER BY ts DESC", interaction.user.id);
+            if (!todos.length)
+                return void interaction.reply({content:"No pinned notes (your pinned notes are now found in `/todo list` as your To-Do list).", ephemeral:true});
             const embed = new EmbedBuilder()
-                .setTitle("📌 Your pinned notes")
-                .setDescription(notes.map((n,i)=>`**[${i+1}]** ${n.note} _(at <t:${Math.floor(n.timestamp/1000)}:f>)_`).join("\n"))
-                .setColor(0xffae52);
+                .setTitle("📝 Your Pinned Notes (To-Do List)")
+                .setDescription(todos.slice(0,10).map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
+                .setColor(0xfecf6a);
             await interaction.reply({embeds:[embed], ephemeral:true});
         } else if (interaction.options.getSubcommand() === "search") {
             const query = interaction.options.getString("query").toLowerCase();
@@ -558,6 +649,58 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
+
+    // --- SLASH: TODO ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'todo') {
+        if (interaction.guild) {
+            await interaction.reply({content:"For privacy, use To-Do in DM only.", ephemeral:true}); return;
+        }
+        const sub = interaction.options.getSubcommand();
+        if (sub === "add") {
+            let txt = interaction.options.getString("content").substring(0,300);
+            await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", interaction.user.id, txt, Date.now());
+            await interaction.reply({content:"📝 To-do added!",ephemeral:true});
+        } else if (sub === "complete") {
+            let idx = interaction.options.getInteger('number');
+            let rows = await db.all("SELECT id, content FROM todo_entries WHERE userId=? ORDER BY ts DESC LIMIT 15", interaction.user.id);
+            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #", ephemeral:true});
+            await db.run("UPDATE todo_entries SET done=1 WHERE id=?", rows[idx-1].id);
+            await interaction.reply({content:`✅ Marked "${rows[idx-1].content}" as done.`, ephemeral:true});
+        } else if (sub === "remove") {
+            let idx = interaction.options.getInteger('number');
+            let rows = await db.all("SELECT id FROM todo_entries WHERE userId=? ORDER BY ts DESC LIMIT 15", interaction.user.id);
+            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #", ephemeral:true});
+            await db.run("DELETE FROM todo_entries WHERE id=?", rows[idx-1].id);
+            await interaction.reply({content:"🗑️ To-do removed.", ephemeral:true});
+        } else if (sub === "list") {
+            let todos = await db.all("SELECT content, done, ts FROM todo_entries WHERE userId=? ORDER BY ts DESC", interaction.user.id);
+            if (!todos.length) return void interaction.reply({content:"Your to-do list is empty!",ephemeral:true});
+            let embed = new EmbedBuilder()
+                .setTitle("📝 Your To-Do List")
+                .setDescription(todos.map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
+                .setColor(0xfcc063);
+            await interaction.reply({embeds:[embed], ephemeral:true});
+        }
+        return;
+    }
+
+    // --- SLASH: DMUSER ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "dmuser") {
+        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+        }
+        const user = interaction.options.getUser('user');
+        const txt = interaction.options.getString('message');
+        try {
+            await user.send(`[Message from admin]\n${txt}`);
+            await interaction.reply({content:`Sent DM to ${user.tag}`, ephemeral:true});
+        } catch {
+            await interaction.reply({content:"I couldn't DM this user (maybe DM closed).", ephemeral:true});
+        }
+        return;
+    }
+
 
 
 
@@ -643,30 +786,58 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
-    // --- SLASH: PURGE --- 
+    // --- SLASH: PURGE with Confirmation and Cooldown ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'purge') {
         if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
             await interaction.reply({content:"You lack perms.",ephemeral:true});
             return;
         }
+        // Safety Cooldown
+        if (!client._purgeCooldown) client._purgeCooldown = {};
+        const lastT = client._purgeCooldown[interaction.user.id]||0;
+        if (Date.now()-lastT < 60000)
+            return void interaction.reply({content:`Please wait before purging again for safety. (${Math.ceil((60000-(Date.now()-lastT))/1000)}s left)`,ephemeral:true});
         let n = interaction.options.getInteger('count');
         if (n<1 || n>50) {
             await interaction.reply({content:'Count must be 1-50.',ephemeral:true});
             return;
         }
-        const chan = await client.channels.fetch(CHANNEL_ID);
-        const msgs = await chan.messages.fetch({limit:Math.min(50,n)});
-        await chan.bulkDelete(msgs, true);
-        await interaction.reply({content:`🧹 Deleted ${msgs.size} messages.`,ephemeral:true});
+        // Confirm visual with button
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('purge_confirm_'+Date.now())
+                .setLabel('Confirm Delete')
+                .setStyle(ButtonStyle.Danger)
+        );
+        await interaction.reply({content:`⚠️ Confirm deletion of ${n} messages?`, components:[row], ephemeral:true});
+        client.once('interactionCreate', async btn=> {
+            if (!btn.isButton() || !btn.customId.startsWith("purge_confirm_") || btn.user.id!==interaction.user.id) return;
+            client._purgeCooldown[interaction.user.id] = Date.now();
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            const msgs = await chan.messages.fetch({limit:Math.min(50,n)});
+            await chan.bulkDelete(msgs, true);
+            await btn.reply({content:`🧹 Deleted ${msgs.size} messages.`,ephemeral:true});
+        });
         return;
     }
+
     // --- SLASH: XP ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'xp') {
         const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', interaction.user.id);
         if (!row) await interaction.reply({content:'No XP on record.',ephemeral:true});
-        else await interaction.reply({content:`You have ${row.xp} XP at level ${row.level}.`,ephemeral:true});
+        else {
+            // Also show last time user leveled up (if possible)
+            let prev = await db.all(`SELECT createdAt FROM message_logs WHERE userId=? ORDER BY createdAt DESC LIMIT 100`, interaction.user.id);
+            // Guess from increments (hack: not strictly precise)
+            let msg = `You have ${row.xp} XP at level ${row.level}.`;
+            if (row.level>=1 && prev.length) {
+                msg += `\n🌟 Leveled up most recently at <t:${Math.floor(prev[0].createdAt/1000)}:f>`;
+            }
+            await interaction.reply({content:msg,ephemeral:true});
+        }
         return;
     }
+
     // --- SLASH: LEADERBOARD ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
         const rows = await db.all('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT 10');
@@ -730,11 +901,13 @@ client.on('messageCreate', async msg => {
             "Hey there! Want help? Try `/` for commands.",
             "👋 How can I help you today?",
             "Use `/note` to keep your thoughts, `/remind` for reminders!",
+            "Want to stay organized? `/todo` manages your to-dos!",
             "Need fun? `/8ball` awaits your questions.",
             "I'm always here to assist. Type `/` to see more."
         ];
         await msg.reply({content: responses[Math.floor(Math.random()*responses.length)], ephemeral: true});
     }
+
 
 
     // --- Log all messages for moderation/stats ---
@@ -800,44 +973,79 @@ client.on('messageDelete', async msg => {
 
 let userWelcomeStatus = {};
 
-// --- DM Welcome/Help, now also includes 'quotes', 'avatar' ---
+const welcomeButtonRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+        .setCustomId('dm_getstarted')
+        .setLabel('Get Started')
+        .setStyle(ButtonStyle.Success)
+);
+
 client.on('messageCreate', async msg => {
     if (msg.guild) return; // only DMs
     if (msg.author.bot) return;
-
-    // DM Help improvement: Welcomes first time in session
+    // Single welcome message per session, with "Get Started" button
     if (!userWelcomeStatus[msg.author.id]) {
         await msg.reply({
             embeds: [
                 new EmbedBuilder()
                     .setTitle("👋 Welcome!")
                     .setDescription([
-                        "I'm your assistant bot, available for **notes**, **reminders**, **polls**, and more via slash commands 😃",
+                        "I'm your private assistant — **notes**, **to-do** (try `/todo`), **reminders**, **polls**, fun and more via slash commands!",
                         "",
                         "**Try:**",
-                        "- `/note add [content]` - Save a private note",
-                        "- `/remind [content] [time]` - Get a DM reminder",
-                        "- `/note pin [number]` - Pin important notes",
-                        "- `/quotes` - A random saved quote",
-                        "- `/avatar` - Show profile pic",
+                        "- `/todo add` to manage a personal to-do list",
+                        "- `/note add` for quick notes",
+                        "- `/remind` for DM reminders",
+                        "- `/avatar` to view profile pictures",
+                        "- `/quotes` to inspire/laugh",
                         "",
-                        "_For all commands, type `/` and browse the menu!_"
+                        "**Click Get Started for a full command guide.**",
                     ].join("\n"))
                     .setColor(0x6ee7b7)
-            ]
+            ],
+            components: [welcomeButtonRow]
         });
         userWelcomeStatus[msg.author.id] = true;
         return;
     }
 
     if (msg.content.startsWith('/help')) {
-        await msg.reply(`Available commands:\n- /note\n- /note search\n- /remind\n- /note pin\n- /poll\n- /timer\n- /timers\n- /quotes\n\n⭐ Use /note pin to pin your favorite notes!`);
+        await msg.reply(`Available commands:\n- /note\n- /note search\n- /todo\n- /remind\n- /poll #channel\n- /timer\n- /timers\n- /quotes\n\n⭐ Use /todo to pin favorites and stay organized!`);
     } else if (/timer/i.test(msg.content)) {
         await msg.reply("Try `/timer` to set a DM countdown for yourself, or `/timers` to view your timers!");
     } else {
-        await msg.reply(`Hi! Please use slash commands such as /note, /note search, /remind, /poll, /timer and more. (Type \`/\` to see all options.)`);
+        await msg.reply(`Hi! Slash commands available: /todo, /note, /note search, /remind, /poll, /timer, /quotes, more! (Type \`/\` to see all options, or click **Get Started** below.)`);
     }
 });
+
+// DM Get Started button handler for welcome embed
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton() || interaction.customId!=='dm_getstarted') return;
+    await interaction.reply({
+        embeds: [
+            new EmbedBuilder()
+                .setTitle("Getting Started with this Bot")
+                .setDescription([
+                    "**Slash Commands for Productivity & Fun**",
+                    "",
+                    "- `/todo add` — Pin new ideas, todos, short notes!",
+                    "- `/todo list`/`complete` — View and check-off your done tasks",
+                    "- `/note add` — Quick notes (private, always DM only)",
+                    "- `/remind` — DM reminders, even days in advance!",
+                    "- `/poll` — Admins: Create quick channel polls",
+                    "- `/xp` — Chat to earn XP & level up",
+                    "- `/8ball` — Ask for cosmic wisdom",
+                    "- `/avatar` — View yours or anyone's pfp",
+                    "- `/leaderboard` — Top chatters/XP",
+                    "",
+                    "🆕 **All personal data is private, saved for YOU — `/todo` and `/note` are in **DMs only**!"
+                ].join("\n"))
+                .setColor(0xfacc15)
+        ],
+        ephemeral: true
+    });
+});
+
 
 
 

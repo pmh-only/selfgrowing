@@ -1,21 +1,29 @@
 {
-  "name": "discord-private-bot",
-  "type": "module",
+  "name": "discord-largebot-singlefile",
   "version": "1.0.0",
-  "description": "A feature-rich Discord bot for a private channel with notes, polls, moderation, reminders and more.",
+  "type": "module",
   "main": "main.mjs",
+  "description": "Large scale multipurpose Discord.js bot - single file (main.mjs), persistent data in /data, focused on UX.",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
-    "sqlite": "^4.3.0",
-    "humanize-duration": "^3.27.0"
+    "sqlite": "^5.2.7",
+    "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "",
-  "license": "MIT"
+  "keywords": [
+    "discord",
+    "discord.js",
+    "bot",
+    "sqlite",
+    "slash-commands",
+    "singlefile"
+  ],
+  "license": "MIT",
+  "author": "YourNameHere"
 }
