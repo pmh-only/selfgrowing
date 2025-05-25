@@ -9,7 +9,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.6.2",
   "dependencies": {
     "discord.js": "^14.19.3",
     "openai": "^4.103.0"
