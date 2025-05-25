@@ -712,10 +712,42 @@ return;
         const embed = new EmbedBuilder()
             .setTitle("💬 Saved Quote")
             .setDescription(`"${q.content}"`)
-            .setFooter({text: `By ${q.user.tag} at <t:${Math.floor(q.timestamp/1000)}:f>${q.category?` | #${q.category}`:""}`});
+            .setFooter({text: `By ${(q.user?.tag || q.author_tag || "Unknown")} at <t:${Math.floor(q.timestamp/1000)}:f>${q.category?` | #${q.category}`:""}`});
         await interaction.reply({embeds:[embed],ephemeral:false});
         return;
     }
+
+    // --- SLASH: QUOTEADD (NEW PUBLIC ADD QUOTE FEATURE) ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "quoteadd") {
+        const authorTag = interaction.options.getString("author_tag");
+        const content = interaction.options.getString("content");
+        let category = interaction.options.getString("category");
+        const quotes = await readJSONFile("quotes.json", []);
+        quotes.push({
+            user: { tag: authorTag },
+            author_tag: authorTag,
+            content,
+            timestamp: Date.now(),
+            category: category || undefined,
+            addedBy: interaction.user.tag
+        });
+        await saveJSONFile("quotes.json", quotes);
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Quote added!")
+                    .setDescription([
+                        `> "${content}"\n`,
+                        `Author: **${authorTag}**`,
+                        category ? `Category: **${category}**` : "",
+                        `Added by: <@${interaction.user.id}>`
+                    ].filter(Boolean).join("\n"))
+                    .setColor(0x91FEDC)
+            ]
+        });
+        return;
+    }
+
 
 
 

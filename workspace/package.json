@@ -1,17 +1,17 @@
 {
-  "name": "discord-largebot-singlefile",
+  "name": "discord-productivity-bot",
   "version": "1.0.0",
+  "description": "A large-scale Discord bot for a single channel with productivity and fun tools.",
   "type": "module",
-  "description": "Large-scale Discord.js bot (single file, modern, slash+context commands, with fun/admin/tools).",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.13.0",
-    "sqlite3": "^5.1.7",
+    "discord.js": "^14.14.1",
+    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.27.0"
+    "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
