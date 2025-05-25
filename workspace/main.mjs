@@ -717,8 +717,15 @@ client.on('interactionCreate', async interaction => {
         const sub = interaction.options.getSubcommand();
         if (sub === "add") {
             let txt = interaction.options.getString("content").substring(0,300);
+            // Suggest related incomplete todos by fuzzy match if available! (UX improvement)
+            let fuzzyMatch = (await db.all("SELECT content FROM todo_entries WHERE userId=? AND done=0", interaction.user.id))
+              .filter(i=>i.content.toLowerCase().includes(txt.slice(0,4).toLowerCase()))
+              .map(i=>i.content);
+            let addMsg = "📝 To-do added!";
+            if (fuzzyMatch.length)
+                addMsg += `\n*Related incomplete to-dos:*\n - `+fuzzyMatch.slice(0,2).join('\n - ');
             await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", interaction.user.id, txt, Date.now());
-            await interaction.reply({content:"📝 To-do added!",ephemeral:true});
+            await interaction.reply({content:addMsg,ephemeral:true});
         } else if (sub === "complete") {
             let idx = interaction.options.getInteger('number');
             let rows = await db.all("SELECT id, content FROM todo_entries WHERE userId=? ORDER BY ts DESC LIMIT 15", interaction.user.id);
@@ -738,10 +745,15 @@ client.on('interactionCreate', async interaction => {
                 .setTitle("📝 Your To-Do List")
                 .setDescription(todos.map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
                 .setColor(0xfcc063);
+
+            // New UX: count completed and incomplete
+            let doneCount = todos.filter(t=>t.done).length;
+            embed.setFooter({text:`${todos.length} total, ${doneCount} completed, ${todos.length-doneCount} remaining`});
             await interaction.reply({embeds:[embed], ephemeral:true});
         }
         return;
     }
+
 
     // --- SLASH: DMUSER ---
     if (interaction.isChatInputCommand() && interaction.commandName === "dmuser") {

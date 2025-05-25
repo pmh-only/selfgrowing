@@ -1,18 +1,16 @@
 {
-  "name": "private-discord-bot",
+  "name": "singlefile-discordbot",
   "version": "1.0.0",
-  "type": "module",
-  "description": "A private, single-channel Discord bot with productivity, moderation, games, and user tools.",
+  "description": "A private, single-channel, feature-rich Discord bot in one file, using discord.js, sqlite and fs.",
   "main": "main.mjs",
+  "type": "module",
   "scripts": {
-    "start": "node --experimental-modules --no-warnings main.mjs"
+    "start": "node main.mjs"
   },
-  "author": "ChatGPT",
-  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
-    "sqlite": "^4.2.2",
+    "sqlite": "^4.2.1",
     "humanize-duration": "^3.29.0"
   }
 }
