@@ -1,12 +1,9 @@
 {
-  "name": "discord-bot",
+  "name": "discordjs-largebot",
   "version": "1.0.0",
-  "description": "A private single-channel Discord bot with admin tools, moderation, games, utilities, and persistent storage.",
-  "main": "main.mjs",
   "type": "module",
-  "scripts": {
-    "start": "node main.mjs"
-  },
+  "main": "main.mjs",
+  "description": "A large-scale Discord.js bot with sqlite persistent storage and slash command UX.",
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite": "^5.1.1",
@@ -15,6 +12,9 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node main.mjs"
   },
   "author": "",
   "license": "MIT"

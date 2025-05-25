@@ -186,22 +186,17 @@ async function scheduleReminders(client) {
     const wait = Math.max(0, next.remindAt - Date.now());
     reminderTimer = setTimeout(async () => {
         try {
-            const user = await client.users.fetch(next.userId);
-            // Prevent DM reminders outside allowed channel. UX: fallback: try ephemeral message if DM fails.
-            try {
-                await user.send(`[⏰ Reminder] ${next.content}`);
-            } catch (e) {
-                // fallback: send ephemeral in main channel if possible
-                const chan = client.channels.cache.get(CHANNEL_ID);
-                if (chan?.isTextBased && chan?.send) {
-                    await chan.send(`<@${next.userId}>: [⏰ Reminder] ${next.content}`);
-                }
+            // All reminders sent to public channel now, per restrictions. No DM.
+            const chan = client.channels.cache.get(CHANNEL_ID);
+            if (chan?.isTextBased && chan?.send) {
+                await chan.send(`<@${next.userId}>: [⏰ Reminder] ${next.content}`);
             }
             await db.run("DELETE FROM reminders WHERE id = ?", next.id);
         } catch(e){}
         scheduleReminders(client);
     }, wait);
 }
+
 
 
 // Intents and partials needed for DMs and single channel operation
@@ -917,18 +912,17 @@ client.on('interactionCreate', async interaction => {
 
     // --- SLASH: PURGE with Confirmation and Cooldown ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'purge') {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms.",ephemeral:true});
-            return;
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
+            await interaction.reply({content:"You lack perms."}); return;
         }
         // Safety Cooldown
         if (!client._purgeCooldown) client._purgeCooldown = {};
         const lastT = client._purgeCooldown[interaction.user.id]||0;
         if (Date.now()-lastT < 60000)
-            return void interaction.reply({content:`Please wait before purging again for safety. (${Math.ceil((60000-(Date.now()-lastT))/1000)}s left)`,ephemeral:true});
+            return void interaction.reply({content:`Please wait before purging again for safety. (${Math.ceil((60000-(Date.now()-lastT))/1000)}s left)`});
         let n = interaction.options.getInteger('count');
         if (n<1 || n>50) {
-            await interaction.reply({content:'Count must be 1-50.',ephemeral:true});
+            await interaction.reply({content:'Count must be 1-50.'});
             return;
         }
         // Confirm visual with button
@@ -938,17 +932,20 @@ client.on('interactionCreate', async interaction => {
                 .setLabel('Confirm Delete')
                 .setStyle(ButtonStyle.Danger)
         );
-        await interaction.reply({content:`⚠️ Confirm deletion of ${n} messages?`, components:[row], ephemeral:true});
-        client.once('interactionCreate', async btn=> {
+        await interaction.reply({content:`⚠️ Confirm deletion of ${n} messages?`, components:[row]});
+        const listener = async btn=> {
             if (!btn.isButton() || !btn.customId.startsWith("purge_confirm_") || btn.user.id!==interaction.user.id) return;
             client._purgeCooldown[interaction.user.id] = Date.now();
             const chan = await client.channels.fetch(CHANNEL_ID);
             const msgs = await chan.messages.fetch({limit:Math.min(50,n)});
             await chan.bulkDelete(msgs, true);
-            await btn.reply({content:`🧹 Deleted ${msgs.size} messages.`,ephemeral:true});
-        });
+            await btn.reply({content:`🧹 Deleted ${msgs.size} messages.`});
+            client.removeListener('interactionCreate', listener);
+        };
+        client.on('interactionCreate', listener);
         return;
     }
+
 
     // --- SLASH: XP ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'xp') {
