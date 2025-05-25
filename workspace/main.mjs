@@ -44,6 +44,30 @@ async function finishPoll(pollRec, chan) {
 
 await ensureDataDir();
 
+/**
+ * Check and migrate pinned_notes legacy table (if present!) into new todo_entries structure.
+ * Migrates pinned_notes(ownerId, noteId) -> todo_entries(userId, content, done, ts), pulling data from notes.
+ * Drops pinned_notes table on success.
+ */
+async function migratePinnedToTodo() {
+    try {
+        const hasTable = await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='pinned_notes'");
+        if (!hasTable) return;
+        // Pull links
+        const pins = await db.all("SELECT * FROM pinned_notes");
+        for (const pin of pins) {
+            // pin: {ownerId, noteId}
+            const n = await db.get("SELECT note, timestamp FROM notes WHERE id=?", pin.noteId);
+            if (n) {
+                // Insert as new todo (set done=0, best guess)
+                await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", pin.ownerId, n.note, n.timestamp);
+            }
+        }
+        await db.run("DROP TABLE pinned_notes");
+    } catch (e) {
+        // fail silently
+    }
+}
 // SQLite DB setup
 const db = await open({
     filename: DATA_DIR + 'botdata.db',
@@ -71,6 +95,8 @@ try {
         } catch {}
     }
 } catch {}
+
+
 
 
 await db.run(`CREATE TABLE IF NOT EXISTS poll (
