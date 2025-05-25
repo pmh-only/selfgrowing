@@ -1,27 +1,20 @@
 {
-  "name": "discord-utility-bot",
+  "name": "discord-private-multi-tool-bot",
   "version": "1.0.0",
-  "description": "A large-scale Discord.js utility bot with moderation, notes, reminders, XP, and more (single-channel, sqlite, persistent data)",
-  "main": "main.mjs",
+  "description": "A private Discord bot for personal and small-group server admin, moderation, productivity, and fun.",
   "type": "module",
+  "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^4.2.1",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.1.6",
+    "sqlite": "^4.3.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": [
-    "discord",
-    "discordjs",
-    "bot",
-    "sqlite",
-    "moderation",
-    "utility"
-  ],
+  "author": "",
   "license": "MIT"
 }

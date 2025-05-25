@@ -194,15 +194,21 @@ client.on('interactionCreate', async interaction => {
                 interaction.user.id, txt, Date.now());
             await interaction.reply({content:'📝 Note saved (DM only)!', ephemeral:true});
         } else if (interaction.options.getSubcommand() === 'list') {
-            const rows = await db.all('SELECT note, timestamp FROM notes WHERE userId=? ORDER BY id DESC LIMIT 10', interaction.user.id);
+            const rows = await db.all('SELECT id, note, timestamp FROM notes WHERE userId=? ORDER BY id DESC LIMIT 10', interaction.user.id);
             if (rows.length === 0) await interaction.reply({content:"No notes yet.", ephemeral:true});
             else {
                 const embed = new EmbedBuilder()
                   .setTitle("Your last 10 notes")
-                  .setDescription(rows.map(r => `• ${r.note} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
+                  .setDescription(rows.map((r,i) => `**[${rows.length-i}]** ${r.note} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
                   .setColor(0x80ecec);
                 await interaction.reply({embeds:[embed], ephemeral:true});
             }
+        } else if (interaction.options.getSubcommand() === 'delete') {
+            const idx = interaction.options.getInteger('number');
+            const allRows = await db.all('SELECT id FROM notes WHERE userId=? ORDER BY id DESC LIMIT 10', interaction.user.id);
+            if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!", ephemeral:true});
+            await db.run('DELETE FROM notes WHERE id=?', allRows[idx-1].id);
+            await interaction.reply({content:"🗑️ Note deleted.", ephemeral:true});
         }
         return;
     }
