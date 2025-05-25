@@ -1,19 +1,21 @@
 {
-  "name": "discordjs-private-bot",
+  "name": "discordjs-singlefile-bot",
   "version": "1.0.0",
+  "description": "A private, single-channel Discord bot using discord.js v14+, with persistent SQLite data and slash commands.",
   "type": "module",
-  "description": "A private Discord bot with admin, moderation, productivity, and fun features.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
+  "dependencies": {
+    "discord.js": "^14.13.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6",
+    "humanize-duration": "^3.29.0"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "discord.js": "^14.14.1",
-    "humanize-duration": "^3.31.0",
-    "sqlite3": "^5.1.7",
-    "sqlite": "^5.1.1"
-  }
+  "author": "",
+  "license": "ISC"
 }

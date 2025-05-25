@@ -616,10 +616,11 @@ client.on('interactionCreate', async interaction => {
                     .setTitle(`${tgt.tag}'s Avatar`)
                     .setImage(tgt.displayAvatarURL({ extension: 'png', size: 4096}))
                     .setColor(0x30cdfa)
-            ], ephemeral: true
+            ]
         });
         return;
     }
+
 
     // --- SLASH: QUOTE (admin, with category modal) ---
     // FIX: Check .member exists before permission check
@@ -903,16 +904,17 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand() && interaction.commandName === 'warnings') {
         const tgt = interaction.options.getUser('user');
         const rows = await db.all('SELECT reason, timestamp FROM warnings WHERE userId=? ORDER BY id DESC LIMIT 10', tgt.id);
-        if (rows.length === 0) await interaction.reply({content:"No warnings for this user!",ephemeral:true});
+        if (rows.length === 0) await interaction.reply({content:"No warnings for this user!"});
         else {
             const embed = new EmbedBuilder()
                 .setTitle(`${tgt.tag}'s last 10 warnings`)
                 .setDescription(rows.map(r=>`• ${r.reason} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
                 .setColor(0xd13a29);
-            await interaction.reply({embeds:[embed], ephemeral:true});
+            await interaction.reply({embeds:[embed]});
         }
         return;
     }
+
     // --- SLASH: PURGE with Confirmation and Cooldown ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'purge') {
         if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
@@ -951,7 +953,7 @@ client.on('interactionCreate', async interaction => {
     // --- SLASH: XP ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'xp') {
         const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', interaction.user.id);
-        if (!row) await interaction.reply({content:'No XP on record.',ephemeral:true});
+        if (!row) await interaction.reply({content:'No XP on record.'});
         else {
             let embed = new EmbedBuilder()
                 .setTitle("Your XP & Level")
@@ -977,10 +979,11 @@ client.on('interactionCreate', async interaction => {
             if (levels.length) {
                 embed.addFields({name:"Level up history",value: levels.slice(-3).reverse().map(l=>`Level **${l.level}** at <t:${Math.floor(l.at/1000)}:f>`).join("\n") });
             }
-            await interaction.reply({embeds: [embed],ephemeral:true});
+            await interaction.reply({embeds: [embed]});
         }
         return;
     }
+
 
     // --- SLASH: ROLL ---
 // UX improvement: more robust/clear error for empty input; add special "roll for initiative" preset
@@ -993,7 +996,7 @@ client.on('interactionCreate', async interaction => {
             let embed = new EmbedBuilder().setTitle("Initiative Rolls")
               .setDescription(rolls.map(r=>`**${r.name}:** ${r.num}`).join("\n"))
               .setColor(0xbada55);
-            await interaction.reply({embeds:[embed], ephemeral:true});
+            await interaction.reply({embeds:[embed]});
             return;
         }
         formula = formula || "1d6";
@@ -1001,7 +1004,7 @@ client.on('interactionCreate', async interaction => {
         if (!formula) formula = "1d6";
         // Parse: <num>d<sides>[+/-mod][optional spaces]
         let m = formula.replace(/\s+/g,"").toLowerCase().match(/^(\d*)d(\d+)((?:[+-]\d+)*)$/);
-        if (!m) return void interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1`.", ephemeral:true});
+        if (!m) return void interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1`."});
 
         let num = parseInt(m[1] || "1",10);
         let sides = parseInt(m[2],10);
@@ -1010,7 +1013,7 @@ client.on('interactionCreate', async interaction => {
         if (modmatches) for (let mod of modmatches) modifier += parseInt(mod,10);
 
         if (isNaN(num) || num<1 || num>100 || isNaN(sides) || sides<2 || sides>1000)
-            return void interaction.reply({content:"Dice count must be 1-100; sides 2-1000.", ephemeral:true});
+            return void interaction.reply({content:"Dice count must be 1-100; sides 2-1000."});
         
         // Roll!
         let rolls = [];
@@ -1040,6 +1043,8 @@ client.on('interactionCreate', async interaction => {
 
 
 
+
+
     // --- SLASH: LEADERBOARD ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
         const rows = await db.all('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT 10');
@@ -1058,7 +1063,7 @@ client.on('interactionCreate', async interaction => {
     // --- SLASH: SNIPE ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'snipe') {
         const lastDeleted = await db.get('SELECT * FROM message_logs WHERE deleted=1 ORDER BY createdAt DESC LIMIT 1');
-        if (!lastDeleted) return void interaction.reply({content:"No deleted messages found.", ephemeral:true});
+        if (!lastDeleted) return void interaction.reply({content:"No deleted messages found."});
         const embed = new EmbedBuilder()
             .setTitle("🕵️ Last Deleted Message")
             .setDescription(lastDeleted.content || "*[no content]*")
@@ -1067,9 +1072,10 @@ client.on('interactionCreate', async interaction => {
         // Add jump link if possible
         if (lastDeleted.guildId && lastDeleted.channelId && lastDeleted.messageId)
           embed.setURL(`https://discord.com/channels/${lastDeleted.guildId}/${lastDeleted.channelId}/${lastDeleted.messageId}`);
-        await interaction.reply({embeds:[embed], ephemeral:true});
+        await interaction.reply({embeds:[embed]});
         return;
     }
+
 
     // --- SLASH: STATS ---
     if (interaction.isChatInputCommand() && interaction.commandName === "stats") {
@@ -1244,7 +1250,7 @@ client.on('interactionCreate', async interaction => {
             let msg = await chan.messages.fetch(mid);
             // Extract first code block, save as note
             let code = (msg.content.match(/```(?:\w+\n)?([\s\S]+?)```/)||[])[1]?.trim() || msg.content.trim();
-            if (!code) return void interaction.reply({content:"Couldn't find code.", ephemeral:false});
+            if (!code) return void interaction.reply({content:"Couldn't find code."});
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)', interaction.user.id, code.substring(0,500), Date.now());
             await interaction.reply({content:"✅ Code saved as note (in `/note list`, public)."});
         } catch(e) {
@@ -1254,13 +1260,15 @@ client.on('interactionCreate', async interaction => {
     }
 
 
+
+
     // POLL VOTING BUTTON HANDLING (fix: check for expired/missing poll, UX improvement)
     if (interaction.isButton() && (/^vote_(\d)$/).test(interaction.customId) || interaction.customId==="vote_retract") {
         const mid = interaction.message?.id;
         // Defensive: Ensure poll not expired/deleted from DB
         let poll = await db.get('SELECT * FROM poll WHERE messageId=?', mid);
         if (!poll) {
-            try { await interaction.reply({content:"Poll expired or closed!",ephemeral:true}); } catch {}
+            try { await interaction.reply({content:"Poll expired or closed!"}); } catch {}
             return;
         }
         let opts;
@@ -1271,12 +1279,12 @@ client.on('interactionCreate', async interaction => {
         let changed = false;
         if (interaction.customId.startsWith("vote_")) {
             let idx = parseInt(interaction.customId.split("_")[1],10);
-            if (idx<0 || idx>=opts.length) return void interaction.reply({content:"Invalid option!",ephemeral:true});
+            if (idx<0 || idx>=opts.length) return void interaction.reply({content:"Invalid option!"});
             if (votes[interaction.user.id]!==idx) { votes[interaction.user.id] = idx; changed=true; }
         } else if (interaction.customId==="vote_retract") {
             if (votes[interaction.user.id]!==undefined) { delete votes[interaction.user.id]; changed = true; }
         }
-        if (!changed) return void interaction.reply({content:"No change to your vote!",ephemeral:true});
+        if (!changed) return void interaction.reply({content:"No change to your vote!"});
         await db.run('UPDATE poll SET votes=? WHERE id=?', JSON.stringify(votes), poll.id);
         // Dynamic update: show new poll results!
         let counts = opts.map((_,i)=>Object.values(votes).filter(v=>v==i).length);
@@ -1294,10 +1302,11 @@ client.on('interactionCreate', async interaction => {
                 ]
             });
         } catch (e) {
-            try { await interaction.reply({content:"Vote registered.",ephemeral:true}); } catch {}
+            try { await interaction.reply({content:"Vote registered."}); } catch {}
         }
         return;
     }
+
 
     // Admin muting XP for a user via a context menu/user command
     if (interaction.isUserContextMenuCommand?.() && interaction.commandName === "Mute XP") {
@@ -1375,10 +1384,10 @@ client.on('interactionCreate', async interaction => {
         interaction.options?.getBoolean("autodelete")===false
     ) {
         if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+            await interaction.reply({content:"You lack perms."}); return;
         }
         await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "off");
-        await interaction.reply({content:"Bot reply auto-delete turned OFF.",ephemeral:true});
+        await interaction.reply({content:"Bot reply auto-delete turned OFF."});
         return;
     } else if (
         typeof interaction.isChatInputCommand === "function" &&
@@ -1387,10 +1396,10 @@ client.on('interactionCreate', async interaction => {
         interaction.options?.getBoolean("autodelete")===true
     ) {
         if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+            await interaction.reply({content:"You lack perms."}); return;
         }
         await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "on");
-        await interaction.reply({content:"Bot reply auto-delete ON (where possible).",ephemeral:true});
+        await interaction.reply({content:"Bot reply auto-delete ON (where possible)."});
         return;
     }
     // Example for bad-words list
@@ -1402,7 +1411,7 @@ client.on('interactionCreate', async interaction => {
         interaction.options?.getString('badword')
     ) {
         if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+            await interaction.reply({content:"You lack perms."}); return;
         }
         let w = interaction.options.getString('badword').toLowerCase();
         let baseList = await readJSONFile("blocked_words.json", []);
@@ -1410,10 +1419,11 @@ client.on('interactionCreate', async interaction => {
             baseList.push(w);
             await saveJSONFile("blocked_words.json", baseList);
         }
-        await interaction.reply({content:"Added to content blocklist.", ephemeral:true});
+        await interaction.reply({content:"Added to content blocklist."});
         return;
     }
 });
+
 
 
 
