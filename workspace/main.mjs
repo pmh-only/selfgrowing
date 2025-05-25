@@ -27,7 +27,8 @@ await db.run(`CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,
     note TEXT NOT NULL,
-    timestamp INTEGER NOT NULL
+    timestamp INTEGER NOT NULL,
+    pinned INTEGER NOT NULL DEFAULT 0
 )`);
 await db.run(`CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY,

@@ -1,16 +1,16 @@
 {
-  "name": "discord-private-multi-tool-bot",
+  "name": "private-discord-bot",
   "version": "1.0.0",
-  "description": "A private Discord bot for personal and small-group server admin, moderation, productivity, and fun.",
   "type": "module",
+  "description": "A private Discord bot with notes, reminders, moderation, and XP features.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.13.0",
     "sqlite3": "^5.1.6",
-    "sqlite": "^4.3.0"
+    "sqlite": "^4.2.1"
   },
   "engines": {
     "node": ">=18.0.0"
