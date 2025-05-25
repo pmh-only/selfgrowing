@@ -1,7 +1,7 @@
 name: Run Automation
 
 on:
-  push:
+  workflow_dispatch:
   schedule:
     - cron: '*/5 * * * *'
   
