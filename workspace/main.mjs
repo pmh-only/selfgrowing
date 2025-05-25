@@ -110,13 +110,19 @@ await db.run(`CREATE TABLE IF NOT EXISTS poll (
     expiresAt INTEGER
 )`);
 // Patch: on startup, close out any expired leftover polls (shouldn't be possible, but for data consistency)
-const leftOpenPolls = await db.all(`SELECT * FROM poll WHERE expiresAt IS NOT NULL AND expiresAt < ?`, Date.now());
-for (const pollRec of leftOpenPolls) {
-    try {
-        const chan = await client.channels.fetch(pollRec.channelId);
-        await finishPoll(pollRec, chan);
-    } catch {}
-}
+// Protect against case client not initialized yet
+let leftOpenPolls = [];
+try {
+    leftOpenPolls = await db.all(`SELECT * FROM poll WHERE expiresAt IS NOT NULL AND expiresAt < ?`, Date.now());
+    for (const pollRec of leftOpenPolls) {
+        try {
+            if (!client || !client.channels) break; // Defensive if client not ready
+            const chan = await client.channels.fetch(pollRec.channelId);
+            await finishPoll(pollRec, chan);
+        } catch {}
+    }
+} catch {}
+
 
 await db.run(`CREATE TABLE IF NOT EXISTS message_logs (
     id INTEGER PRIMARY KEY,
@@ -1008,7 +1014,10 @@ client.on('interactionCreate', async interaction => {
             if (!formula) formula = "1d6";
             // Parse: <num>d<sides>[+/-mod][optional spaces]
             let m = formula.replace(/\s+/g,"").toLowerCase().match(/^(\d*)d(\d+)((?:[+-]\d+)*)$/);
-            if (!m) return void interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1`."});
+            if (!m) {
+                await interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1`."});
+                return;
+            }
 
             let num = parseInt(m[1] || "1",10);
             let sides = parseInt(m[2],10);
@@ -1016,8 +1025,9 @@ client.on('interactionCreate', async interaction => {
             let modmatches = (m[3]||"").match(/[+-]\d+/g);
             if (modmatches) for (let mod of modmatches) modifier += parseInt(mod,10);
 
-            if (isNaN(num) || num<1 || num>100 || isNaN(sides) || sides<2 || sides>1000)
-                return void interaction.reply({content:"Dice count must be 1-100; sides 2-1000."});
+            if (isNaN(num) || num<1 || num>100 || isNaN(sides) || sides<2 || sides>1000) {
+                await interaction.reply({content:"Dice count must be 1-100; sides 2-1000."}); return;
+            }
             
             // Roll!
             let rolls = [];
@@ -1042,10 +1052,13 @@ client.on('interactionCreate', async interaction => {
                 new EmbedBuilder().setTitle("Dice Roll").setDescription(desc).setColor(0xffbe29)
             ]});
         } catch (e) {
-            await interaction.reply({content:"An error occurred while rolling dice."});
+            try {
+                await interaction.reply({content:"An error occurred while rolling dice."});
+            } catch {}
         }
         return;
     }
+
 
 
 
@@ -1362,12 +1375,13 @@ client.once('ready', () => {
 
 client.on('messageDelete', async msg => {
     // Log which message was deleted for use with /snipe
-    if (!msg.partial && msg.guild && msg.channel.id === CHANNEL_ID && !msg.author?.bot) {
+    if (!msg.partial && msg.guild && msg.channel && msg.channel.id === CHANNEL_ID && !msg.author?.bot) {
         // Also try to record more info for snipe jump link, in case possible
         await db.run("UPDATE message_logs SET deleted=1, messageId=?, channelId=?, guildId=? WHERE userId=? AND content=? AND deleted=0 ORDER BY createdAt DESC LIMIT 1",
             msg.id, msg.channel.id, msg.guild.id, msg.author.id, msg.content);
     }
 });
+
 
 
 

@@ -1,7 +1,7 @@
 {
-  "name": "discord-bot",
+  "name": "discord-single-file-bot",
   "version": "1.0.0",
-  "description": "Large scale Discord.js bot using ESM, sqlite3, and related utilities, single main.mjs entry.",
+  "description": "A large scale Discord.js bot using a single main.mjs file. Features: public notes, to-do, reminders, polls, content moderation, games, and more.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -10,12 +10,7 @@
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^5.1.6",
     "humanize-duration": "^3.29.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "author": "",
-  "license": "MIT"
+  }
 }
