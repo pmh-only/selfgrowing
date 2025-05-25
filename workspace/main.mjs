@@ -17,87 +17,6 @@ async function ensureDataDir() {
     catch { await fs.mkdir(DATA_DIR, { recursive: true }) }
 }
 
-
-/*
-// ---- SLASH: STICKY ----
-*Moved below: sticky handler is consolidated inside main on('interactionCreate') to improve UX, avoid double listeners.*
-/*
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand() || interaction.commandName !== "sticky") return;
-    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-        await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
-    }
-    let msg = interaction.options.getString('message');
-    if (msg.length > 400) msg = msg.slice(0,400) + "...";
-    if (!msg.trim() || msg.trim() === '""') {
-        await db.run("DELETE FROM sticky WHERE channelId=?", CHANNEL_ID);
-        await interaction.reply({content:"Sticky message removed.", ephemeral:true});
-        return;
-    }
-    await db.run('INSERT OR REPLACE INTO sticky(channelId, message, setBy, createdAt) VALUES (?,?,?,?)',
-        CHANNEL_ID, msg, interaction.user.id, Date.now());
-    await interaction.reply({content:`Sticky message set for this channel.`, ephemeral:true});
-    // Try to pin a message in the channel itself as sticky (if any previous sticky, try to find and edit/remove!)
-    try {
-        const chan = await client.channels.fetch(CHANNEL_ID);
-        let stickyMsgs = await chan.messages.fetch({ limit: 10 });
-        let prev = stickyMsgs.find(m=>m.author.id===client.user.id && m.content.startsWith("__**Sticky Message**__"));
-        if (prev) await prev.delete();
-        await chan.send({
-            content: `__**Sticky Message**__\n${msg}\n*(set by <@${interaction.user.id}>)*`
-        });
-    } catch{}
-    return;
-});
-*/
-
-
-            return;
-        }
-        if (interaction.customId === "vote_retract") {
-            let votes = {};
-            try { votes = JSON.parse(pollRecord.votes || "{}"); } catch {}
-            if (!votes[interaction.user.id] && votes[interaction.user.id]!==0) {
-                await interaction.reply({content:"You haven't voted yet.", ephemeral:true}); return;
-            }
-            delete votes[interaction.user.id];
-            await db.run("UPDATE poll SET votes=? WHERE messageId=?", JSON.stringify(votes), interaction.message.id);
-            await interaction.reply({content:"Your vote has been retracted.", ephemeral:true});
-            return;
-        }
-        const optionIdx = parseInt(interaction.customId.split("_")[1]);
-        let votes = {};
-        try { votes = JSON.parse(pollRecord.votes || "{}"); } catch {}
-        votes[interaction.user.id] = optionIdx;
-        await db.run("UPDATE poll SET votes=? WHERE messageId=?", JSON.stringify(votes), interaction.message.id);
-
-        // Tally and update poll message with visually updated buttons
-        // Show current results only to voter
-        const opts = JSON.parse(pollRecord.options);
-        let counts = opts.map((_,i)=>Object.values(votes).filter(v=>v==i).length);
-        let total = counts.reduce((a,b)=>a+b,0);
-        let userVote = optionIdx;
-        let desc = opts.map((opt,i)=>
-            `${pollEmojis[i]} **${opt}** — ${counts[i]} vote${counts[i]!=1?'s':''}` +
-            (userVote===i ? " **⬅️ Your selection**" : "")
-        ).join("\n");
-        if (total===0) desc+="\n*No votes yet*";
-
-        await interaction.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle(`📊 ${pollRecord.title} (Vote Registered)`)
-                    .setDescription(desc)
-                    .setFooter({text: `Poll closes at <t:${Math.floor(pollRecord.expiresAt/1000)}:f>`})
-            ],
-            ephemeral: true
-        });
-        // Quick UX: acknowledge on button, don't update base poll message (other than at end)
-        return;
-    }
-
-});
-
 // ------- Helper: End poll and show results ---------
 async function finishPoll(pollRec, chan) {
     try {
@@ -122,8 +41,7 @@ async function finishPoll(pollRec, chan) {
         await db.run("DELETE FROM poll WHERE id=?", pollRec.id);
     } catch {}
 }
- }
-}
+
 await ensureDataDir();
 
 // SQLite DB setup
