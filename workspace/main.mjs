@@ -949,93 +949,104 @@ client.on('interactionCreate', async interaction => {
 
     // --- SLASH: XP ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'xp') {
-        const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', interaction.user.id);
-        if (!row) await interaction.reply({content:'No XP on record.'});
-        else {
-            let embed = new EmbedBuilder()
-                .setTitle("Your XP & Level")
-                .setDescription(`You have **${row.xp} XP**, Level **${row.level}**.`)
-                .setColor(0x8bd5f5);
-            // Provide recent level-up history with timestamps
-            let allMsgs = await db.all(`SELECT createdAt FROM message_logs WHERE userId=? ORDER BY createdAt DESC LIMIT 300`, interaction.user.id);
-            if (row.level >= 1 && allMsgs.length) {
-                embed.setFooter({text: `Most recent message: <t:${Math.floor(allMsgs[0].createdAt/1000)}:f>`});
-            }
-            let levels = [];
-            // Guess which messages probably matched a level increase (every 100 XP; not 100% precise, fun display only)
-            let lastLevel = 0;
-            let userXp = 0, userLevel = 0;
-            for (let rec of allMsgs.reverse()) {
-                userXp += 4; // average, can fudge with +/- if storing real XP per message
-                if (userXp >= (userLevel+1)*100) {
-                    userXp = 0;
-                    userLevel += 1;
-                    levels.push({ level: userLevel, at: rec.createdAt });
+        try {
+            const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', interaction.user.id);
+            if (!row) {
+                await interaction.reply({content:'No XP on record.'});
+            } else {
+                let embed = new EmbedBuilder()
+                    .setTitle("Your XP & Level")
+                    .setDescription(`You have **${row.xp} XP**, Level **${row.level}**.`)
+                    .setColor(0x8bd5f5);
+                // Provide recent level-up history with timestamps
+                let allMsgs = await db.all(`SELECT createdAt FROM message_logs WHERE userId=? ORDER BY createdAt DESC LIMIT 300`, interaction.user.id);
+                if (row.level >= 1 && allMsgs.length) {
+                    embed.setFooter({text: `Most recent message: <t:${Math.floor(allMsgs[0].createdAt/1000)}:f>`});
                 }
+                let levels = [];
+                // Guess which messages probably matched a level increase (every 100 XP; not 100% precise, fun display only)
+                let lastLevel = 0;
+                let userXp = 0, userLevel = 0;
+                for (let rec of allMsgs.reverse()) {
+                    userXp += 4; // average, can fudge with +/- if storing real XP per message
+                    if (userXp >= (userLevel+1)*100) {
+                        userXp = 0;
+                        userLevel += 1;
+                        levels.push({ level: userLevel, at: rec.createdAt });
+                    }
+                }
+                if (levels.length) {
+                    embed.addFields({name:"Level up history",value: levels.slice(-3).reverse().map(l=>`Level **${l.level}** at <t:${Math.floor(l.at/1000)}:f>`).join("\n") });
+                }
+                await interaction.reply({embeds: [embed]});
             }
-            if (levels.length) {
-                embed.addFields({name:"Level up history",value: levels.slice(-3).reverse().map(l=>`Level **${l.level}** at <t:${Math.floor(l.at/1000)}:f>`).join("\n") });
-            }
-            await interaction.reply({embeds: [embed]});
+        } catch(e) {
+            await interaction.reply({content:'Sorry, there was an error fetching your XP/Level.'});
         }
         return;
     }
+
 
 
     // --- SLASH: ROLL ---
 // UX improvement: more robust/clear error for empty input; add special "roll for initiative" preset
     if (interaction.isChatInputCommand() && interaction.commandName === "roll") {
-        let formula = interaction.options?.getString?.("formula");
-        if (formula && formula.trim().toLowerCase() === "initiative") {
-            // Roll d20+DEX for up to 6 (prompt DMs for names/details if desired)
+        try {
+            let formula = interaction.options?.getString?.("formula");
+            if (formula && formula.trim().toLowerCase() === "initiative") {
+                // Roll d20+DEX for up to 6 (prompt DMs for names/details if desired)
+                let rolls = [];
+                for (let i=0;i<6;i++) rolls.push({num: Math.floor(Math.random()*20)+1, name: `Player ${i+1}`});
+                let embed = new EmbedBuilder().setTitle("Initiative Rolls")
+                .setDescription(rolls.map(r=>`**${r.name}:** ${r.num}`).join("\n"))
+                .setColor(0xbada55);
+                await interaction.reply({embeds:[embed]});
+                return;
+            }
+            formula = formula || "1d6";
+            formula = formula.trim();
+            if (!formula) formula = "1d6";
+            // Parse: <num>d<sides>[+/-mod][optional spaces]
+            let m = formula.replace(/\s+/g,"").toLowerCase().match(/^(\d*)d(\d+)((?:[+-]\d+)*)$/);
+            if (!m) return void interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1`."});
+
+            let num = parseInt(m[1] || "1",10);
+            let sides = parseInt(m[2],10);
+            let modifier = 0;
+            let modmatches = (m[3]||"").match(/[+-]\d+/g);
+            if (modmatches) for (let mod of modmatches) modifier += parseInt(mod,10);
+
+            if (isNaN(num) || num<1 || num>100 || isNaN(sides) || sides<2 || sides>1000)
+                return void interaction.reply({content:"Dice count must be 1-100; sides 2-1000."});
+            
+            // Roll!
             let rolls = [];
-            for (let i=0;i<6;i++) rolls.push({num: Math.floor(Math.random()*20)+1, name: `Player ${i+1}`});
-            let embed = new EmbedBuilder().setTitle("Initiative Rolls")
-              .setDescription(rolls.map(r=>`**${r.name}:** ${r.num}`).join("\n"))
-              .setColor(0xbada55);
-            await interaction.reply({embeds:[embed]});
-            return;
+            for (let i=0;i<num;i++) rolls.push(Math.floor(Math.random()*sides)+1);
+            let sum = rolls.reduce((a,b)=>a+b,0) + modifier;
+            let desc = `🎲 Rolling: \`${num}d${sides}${modifier? (modifier>0?`+${modifier}`:modifier):""}\`  \nResults: [${rolls.join(", ")}]`
+                + (modifier ? ` ${modifier>0?"+":""}${modifier}` : "") + `\n**Total:** \`${sum}\``;
+            
+            // UX: If many dice, summarize highlights
+            if (num > 10) {
+                desc += `\nTop rolls: ${[...rolls].sort((a,b)=>b-a).slice(0,5).join(", ")}`;
+                desc += `\nLowest: ${[...rolls].sort((a,b)=>a-b).slice(0,3).join(", ")}`;
+            }
+            // Flavor message for nat 1 or max, d20
+            if (sides===20 && num===1) {
+                if (rolls[0]===20)
+                    desc += "\n🌟 **NAT 20!** Critical success!";
+                else if (rolls[0]===1)
+                    desc += "\n💀 NAT 1! Oof.";
+            }
+            await interaction.reply({embeds:[
+                new EmbedBuilder().setTitle("Dice Roll").setDescription(desc).setColor(0xffbe29)
+            ]});
+        } catch (e) {
+            await interaction.reply({content:"An error occurred while rolling dice."});
         }
-        formula = formula || "1d6";
-        formula = formula.trim();
-        if (!formula) formula = "1d6";
-        // Parse: <num>d<sides>[+/-mod][optional spaces]
-        let m = formula.replace(/\s+/g,"").toLowerCase().match(/^(\d*)d(\d+)((?:[+-]\d+)*)$/);
-        if (!m) return void interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1`."});
-
-        let num = parseInt(m[1] || "1",10);
-        let sides = parseInt(m[2],10);
-        let modifier = 0;
-        let modmatches = (m[3]||"").match(/[+-]\d+/g);
-        if (modmatches) for (let mod of modmatches) modifier += parseInt(mod,10);
-
-        if (isNaN(num) || num<1 || num>100 || isNaN(sides) || sides<2 || sides>1000)
-            return void interaction.reply({content:"Dice count must be 1-100; sides 2-1000."});
-        
-        // Roll!
-        let rolls = [];
-        for (let i=0;i<num;i++) rolls.push(Math.floor(Math.random()*sides)+1);
-        let sum = rolls.reduce((a,b)=>a+b,0) + modifier;
-        let desc = `🎲 Rolling: \`${num}d${sides}${modifier? (modifier>0?`+${modifier}`:modifier):""}\`  \nResults: [${rolls.join(", ")}]`
-            + (modifier ? ` ${modifier>0?"+":""}${modifier}` : "") + `\n**Total:** \`${sum}\``;
-        
-        // UX: If many dice, summarize highlights
-        if (num > 10) {
-            desc += `\nTop rolls: ${[...rolls].sort((a,b)=>b-a).slice(0,5).join(", ")}`;
-            desc += `\nLowest: ${[...rolls].sort((a,b)=>a-b).slice(0,3).join(", ")}`;
-        }
-        // Flavor message for nat 1 or max, d20
-        if (sides===20 && num===1) {
-            if (rolls[0]===20)
-                desc += "\n🌟 **NAT 20!** Critical success!";
-            else if (rolls[0]===1)
-                desc += "\n💀 NAT 1! Oof.";
-        }
-        await interaction.reply({embeds:[
-            new EmbedBuilder().setTitle("Dice Roll").setDescription(desc).setColor(0xffbe29)
-        ]});
         return;
     }
+
 
 
 
