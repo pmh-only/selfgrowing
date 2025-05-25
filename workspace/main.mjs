@@ -456,7 +456,15 @@ const commands = [
 
 
 const rest = new REST({version: '10'}).setToken(TOKEN);
-await rest.put(Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID), {body: [...commands, ...contextCommands]});
+try {
+    await rest.put(
+        Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID),
+        {body: [...commands, ...contextCommands]}
+    );
+} catch (err) {
+    console.error("Failed to register slash commands!", err && err.stack ? err.stack : err);
+}
+
 
 
 
@@ -1364,9 +1372,10 @@ client.on('interactionCreate', async interaction => {
         // Permissions not required - all users are 'admin' for demonstration
         await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
             interaction.targetUser.id, "XP MUTE (admin muted)", Date.now());
-        await interaction.reply({content:`🔇 User ${interaction.targetUser.tag} will not earn XP until unmuted.`, ephemeral:true});
+        await interaction.reply({content:`🔇 User ${interaction.targetUser.tag} will not earn XP until unmuted.`});
         return;
     }
+
 
 
 
@@ -1419,15 +1428,18 @@ const welcomeButtonRow = new ActionRowBuilder().addComponents(
         .setStyle(ButtonStyle.Success)
 );
 
-// Handle uncaught exceptions to prevent crash
+// Safety: ensure error handler always logs full error details (fix: error may be object or string, output .stack if present)
 process.on("uncaughtException", err => {
-    console.error("Uncaught Exception:", err);
+    if (err && err.stack) console.error("Uncaught Exception:", err.stack);
+    else console.error("Uncaught Exception:", err);
 });
 
 // Global error handler for unhandled rejections as well (prevents crash on async errors)
 process.on("unhandledRejection", err => {
-    console.error("Unhandled Rejection:", err);
+    if (err && err.stack) console.error("Unhandled Rejection:", err.stack);
+    else console.error("Unhandled Rejection:", err);
 });
+
 
 
 
