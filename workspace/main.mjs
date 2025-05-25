@@ -51,6 +51,23 @@ async function finishPoll(pollRec, chan) {
         await interaction.reply({content:`✅ All warnings for <@${tgt.id}> have been removed.`});
         return;
     }
+
+    // --- SLASH: UNMUTE XP (remove "XP MUTE" warnings for user), NEW FEATURE ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'unmute') {
+        const tgt = interaction.options.getUser('user');
+        if (!tgt) {
+            await interaction.reply({content: "You must select a user!"});
+            return;
+        }
+        // Only remove warnings where reason is about XP MUTE/muted
+        const existed = await db.get("SELECT COUNT(*) as n FROM warnings WHERE userId=? AND reason LIKE '%XP MUTE%'", tgt.id);
+        if (!existed || !existed.n) {
+            await interaction.reply({content:"User <@"+tgt.id+"> is not XP muted."}); return;
+        }
+        await db.run("DELETE FROM warnings WHERE userId=? AND reason LIKE '%XP MUTE%'", tgt.id);
+        await interaction.reply({content:`✅ <@${tgt.id}> is no longer XP muted and will gain XP!`});
+        return;
+    }
 });
 
         // Remove poll from db
@@ -59,6 +76,7 @@ async function finishPoll(pollRec, chan) {
 }
 
 await ensureDataDir();
+
 
 /**
  * Check and migrate pinned_notes legacy table (if present!) into new todo_entries structure.

@@ -1,18 +1,16 @@
 {
-  "name": "discord-largebot",
+  "name": "discord-bot-large",
   "version": "1.0.0",
+  "description": "A large-scale Discord bot with admin tools, moderation, games, and user utilities.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
-    "start": "node --no-warnings main.mjs"
+    "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
     "humanize-duration": "^3.29.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }
