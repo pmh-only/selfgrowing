@@ -40,6 +40,22 @@ await db.run(`CREATE TABLE IF NOT EXISTS poll (
     votes TEXT NOT NULL DEFAULT '{}',
     expiresAt INTEGER
 )`);
+await db.run(`CREATE TABLE IF NOT EXISTS message_logs (
+    id INTEGER PRIMARY KEY,
+    userId TEXT NOT NULL,
+    username TEXT,
+    content TEXT,
+    createdAt INTEGER NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0
+)`);
+await db.run(`CREATE TABLE IF NOT EXISTS pinned_notes (
+    id INTEGER PRIMARY KEY,
+    ownerId TEXT NOT NULL,
+    noteId INTEGER NOT NULL,
+    UNIQUE(ownerId, noteId)
+)`);
+// Pinning system for notes
+
 await db.run(`CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,
@@ -100,9 +116,12 @@ const commands = [
         options: [
             { name: 'add', type: 1, description: 'Add a private note', options:[{name:'content',type:3,description:'Your note',required:true}]},
             { name: 'list', type: 1, description: 'View your private notes'},
-            { name: 'delete', type: 1, description: 'Delete a note by its number', options: [{name:"number",type:4,description:"Note number from /note list",required:true}]}
+            { name: 'delete', type: 1, description: 'Delete a note by its number', options: [{name:"number",type:4,description:"Note number from /note list",required:true}]},
+            { name: 'pin', type: 1, description: 'Pin a note by its number', options: [{name:"number",type:4,description:"Note # to pin",required:true}]},
+            { name: 'pinned', type: 1, description: 'View your pinned notes'}
         ]
     },
+
     {
         name: 'remind',
         description: 'Set a reminder (DM only, use e.g. /remind "Walk dog" in 10m).',
@@ -166,8 +185,17 @@ const commands = [
         options: [
             { name:'autodelete',type:5,description:"Enable/disable auto-deleting moderation bot replies",required:true }
         ]
+    },
+    {
+        name: 'snipe',
+        description: "Show the last deleted message in this channel (moderation tool)"
+    },
+    {
+        name: 'stats',
+        description: "Show bot usage stats & message counts"
     }
 ];
+
 
 const rest = new REST({version: '10'}).setToken(TOKEN);
 await rest.put(Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID), {body: commands});
@@ -220,9 +248,28 @@ client.on('interactionCreate', async interaction => {
             if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!", ephemeral:true});
             await db.run('DELETE FROM notes WHERE id=?', allRows[idx-1].id);
             await interaction.reply({content:"🗑️ Note deleted.", ephemeral:true});
+        } else if (interaction.options.getSubcommand() === "pin") {
+            const idx = interaction.options.getInteger('number');
+            const allRows = await db.all('SELECT id FROM notes WHERE userId=? ORDER BY id DESC LIMIT 10', interaction.user.id);
+            if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!", ephemeral:true});
+            await db.run('INSERT OR IGNORE INTO pinned_notes(ownerId, noteId) VALUES (?, ?)', interaction.user.id, allRows[idx-1].id);
+            await interaction.reply({content:"📌 Note pinned!", ephemeral:true});
+        } else if (interaction.options.getSubcommand() === "pinned") {
+            const noteIds = await db.all('SELECT noteId FROM pinned_notes WHERE ownerId=?', interaction.user.id);
+            if (noteIds.length === 0) return void interaction.reply({content:"No pinned notes.", ephemeral:true});
+            const notes = await db.all(
+                'SELECT note, timestamp FROM notes WHERE id IN ('+ noteIds.map(()=>"?").join(',') +')', ...noteIds.map(r=>r.noteId)
+            );
+            if (!notes.length) return void interaction.reply({content:"No pinned notes.", ephemeral:true});
+            const embed = new EmbedBuilder()
+                .setTitle("📌 Your pinned notes")
+                .setDescription(notes.map((n,i)=>`**[${i+1}]** ${n.note} _(at <t:${Math.floor(n.timestamp/1000)}:f>)_`).join("\n"))
+                .setColor(0xffae52);
+            await interaction.reply({embeds:[embed], ephemeral:true});
         }
         return;
     }
+
 
     // --- SLASH: REMIND ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'remind') {
@@ -304,13 +351,55 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({content:`🎱 *Q: ${q}*\nA: **${reply}**`, ephemeral:false});
         return;
     }
+    // --- SLASH: SNIPE ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'snipe') {
+        const lastDeleted = await db.get('SELECT * FROM message_logs WHERE deleted=1 ORDER BY createdAt DESC LIMIT 1');
+        if (!lastDeleted) return void interaction.reply({content:"No deleted messages found.", ephemeral:true});
+        const embed = new EmbedBuilder()
+            .setTitle("🕵️ Last Deleted Message")
+            .setDescription(lastDeleted.content || "*[no content]*")
+            .setFooter({text: `By ${lastDeleted.username || lastDeleted.userId}`})
+            .setTimestamp(lastDeleted.createdAt || Date.now());
+        await interaction.reply({embeds:[embed], ephemeral:true});
+        return;
+    }
+    // --- SLASH: STATS ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "stats") {
+        const totalMsgs = await db.get('SELECT COUNT(*) as n FROM message_logs');
+        const delMsgs = await db.get('SELECT COUNT(*) as n FROM message_logs WHERE deleted=1');
+        const notesCount = await db.get('SELECT COUNT(*) as n FROM notes');
+        const warns = await db.get('SELECT COUNT(*) as n FROM warnings');
+        const users = await db.get('SELECT COUNT(DISTINCT userId) as n FROM xp');
+        const embed = new EmbedBuilder()
+          .setTitle("Bot statistics")
+          .addFields(
+            { name: "Tracked messages", value: ""+totalMsgs.n, inline: true },
+            { name: "Deleted messages", value: ""+delMsgs.n, inline: true },
+            { name: "Notes", value: ""+notesCount.n, inline: true },
+            { name: "Warnings", value: ""+warns.n, inline: true },
+            { name: "Active users", value: ""+users.n, inline: true }
+          )
+          .setColor(0x2e89ff);
+        await interaction.reply({embeds:[embed], ephemeral:true});
+        return;
+    }
 });
 
-// --- XP GAIN SYSTEM ---
+
+let lastMessageUserCache = {};
+
 client.on('messageCreate', async msg => {
     // Restrict to the one allowed channel (except for DMs)
     if (msg.guild && msg.channel.id !== CHANNEL_ID) return;
     if (msg.author.bot) return;
+
+    // --- Log all messages for moderation/stats ---
+    if (msg.guild) {
+        await db.run('INSERT INTO message_logs(userId, username, content, createdAt) VALUES (?,?,?,?)',
+            msg.author.id, (msg.member?.user?.tag || msg.author.username), msg.content, Date.now());
+        lastMessageUserCache[msg.author.id] = { username: msg.member?.user?.tag || msg.author.username };
+    }
+
     // Don't run in DMs except for reminders/notes slash cmds
     // XP, content moderation, games: only in main channel
     if (msg.guild) {
@@ -332,6 +421,10 @@ client.on('messageCreate', async msg => {
         // Basic moderation: block bad words
         const badwords = ['badword1','badword2','fuck','shit','bitch','asshole'];
         if (badwords.some(w=>msg.content.toLowerCase().includes(w))) {
+            await db.run(
+                'UPDATE message_logs SET deleted=1 WHERE userId=? ORDER BY createdAt DESC LIMIT 1',
+                msg.author.id
+            );
             await msg.delete().catch(()=>{});
             await msg.reply({content:"🚫 Message removed for inappropriate language.",ephemeral:true});
             await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
@@ -340,10 +433,18 @@ client.on('messageCreate', async msg => {
     }
 });
 
+
 // --- Startup reminder boot ---
 client.once('ready', () => {
     console.log(`Ready as ${client.user.tag}`);
     scheduleReminders(client);
+});
+
+client.on('messageDelete', async msg => {
+    // Log which message was deleted for use with /snipe
+    if (!msg.partial && msg.guild && msg.channel.id === CHANNEL_ID && !msg.author?.bot) {
+        await db.run("UPDATE message_logs SET deleted=1 WHERE userId=? AND content=? AND deleted=0 ORDER BY createdAt DESC LIMIT 1", msg.author.id, msg.content);
+    }
 });
 
 // --- DMs: Accept notes/reminders only
@@ -351,8 +452,10 @@ client.on('messageCreate', async msg => {
     if (msg.guild) return; // only DMs
     if (msg.author.bot) return;
     if (msg.content.startsWith('/help')) {
-        await msg.reply(`Available commands:\n- /note\n- /remind\nPlease use slash commands.`);
+        await msg.reply(`Available commands:\n- /note\n- /remind\n\n⭐ You can now pin notes using /note pin!`);
     } else {
-        await msg.reply(`Hi! Please use slash commands for notes or reminders.`);
+        await msg.reply(`Hi! Please use slash commands for notes, reminders, and new features like pinning notes!`);
     }
 });
+
+
