@@ -1,3 +1,5 @@
+name: Run Automation
+
 on:
   push:
   schedule:
