@@ -1,16 +1,19 @@
 {
-  "name": "private-discord-bot",
+  "name": "discordjs-private-bot",
   "version": "1.0.0",
   "type": "module",
   "main": "main.mjs",
-  "description": "Private single-server Discord bot with moderation, notes, polls, todo, XP and fun features.",
-  "engines": {
-    "node": ">=18.0.0"
-  },
+  "description": "A large-scale Discord bot with admin tools, fun, moderation, dice games, notes, polls, reminders. Single-file main.mjs.",
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node main.mjs"
   }
 }
