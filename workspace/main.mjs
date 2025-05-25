@@ -1419,7 +1419,46 @@ return;
         return;
     }
 
+    // --- SLASH: UPVOTES ---
+
+    if (interaction.isChatInputCommand() && interaction.commandName === 'upvotes') {
+        // Show the most upvoted messages in the channel (public leaderboard)
+        let votes = [];
+        try {
+            votes = await db.all(`
+                SELECT messageId, COUNT(*) as votes
+                FROM reactions
+                WHERE reaction='👍'
+                GROUP BY messageId
+                ORDER BY votes DESC
+                LIMIT 5
+            `);
+        } catch {}
+        if (!votes || !votes.length) {
+            await interaction.reply({content:"No upvoted messages yet! Right click a message and use **Thumbs Up** to upvote."});
+            return;
+        }
+        let embed = new EmbedBuilder()
+            .setTitle("🌟 Top Upvoted Messages")
+            .setDescription("The most 'Thumbs Up' messages in this channel.");
+        let lines = [];
+        for (let row of votes) {
+            try {
+                let chan = await client.channels.fetch(CHANNEL_ID);
+                let msg = await chan.messages.fetch(row.messageId);
+                let jumplink = msg.url ? `[jump](${msg.url})` : "";
+                lines.push(`> "${msg.content.slice(0,60)}" — **${row.votes} 👍** ${jumplink}`);
+            } catch {
+                lines.push(`(Message deleted) — **${row.votes} 👍**`);
+            }
+        }
+        embed.setDescription(lines.join("\n") || "No upvoted messages found.");
+        await interaction.reply({embeds:[embed]});
+        return;
+    }
+
     // --- SLASH: ROCK PAPER SCISSORS ---
+
     if (interaction.isChatInputCommand() && interaction.commandName === 'rockpaperscissors') {
         const opponent = interaction.options.getUser('opponent');
         if (!opponent || opponent.bot || opponent.id === interaction.user.id) {
