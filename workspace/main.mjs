@@ -430,21 +430,27 @@ const eightBallResponses = [
 ];
 
 
-// --- Restrict allowed channel for MESSAGE & SLASH --- 
+/**
+ * Restrict allowed channel for MESSAGE & SLASH
+ * Fix: Properly check for undefined channel (bot DMs from app.home don't have .channel), so don't error.
+ * Also: fix interaction.channel.type undefined bug for system/app_home/other types. DMs are type === 1 or interaction.channel is null (DM), text/guild channels differ.
+ */
 client.on('interactionCreate', async interaction => {
-    // Only allow the configured channel for everything except DMs
+    // Only allow the configured channel for everything except DMs & system commands with no channel (edge case: application commands may have .channel undefined)
     if (
         (interaction.channel && interaction.channel.id !== CHANNEL_ID) &&
-        interaction.channel.type !== 1 // 1 = DM
+        (interaction.channel?.type !== 1) // 1 = DM
     ) {
-        await interaction.reply({content: 'You cannot use me here.', ephemeral:true});
+        try { await interaction.reply({content: 'You cannot use me here.', ephemeral:true}); } catch{}
         return;
     }
 
 
+
     // ---- SLASH: POLL ----
+    // FIX: Ensure permissions check works in DMs (where .member may be null)
     if (interaction.isChatInputCommand() && interaction.commandName === 'poll') {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
             await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
         }
         const title = interaction.options.getString("title");
@@ -478,6 +484,7 @@ client.on('interactionCreate', async interaction => {
         }, dur);
         return;
     }
+
 
 
     // -- SLASH: POLLRESULTS --
@@ -514,8 +521,9 @@ client.on('interactionCreate', async interaction => {
     }
 
     // --- SLASH: QUOTE (admin, with category modal) ---
+    // FIX: Check .member exists before permission check
     if (interaction.isChatInputCommand() && interaction.commandName === "quote") {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
             await interaction.reply({content:"You lack perms.", ephemeral:true});
             return;
         }
@@ -560,6 +568,7 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
 
     // --- SLASH: QUOTES (random, filter by tag) ---
     if (interaction.isChatInputCommand() && interaction.commandName === "quotes") {
@@ -680,8 +689,9 @@ client.on('interactionCreate', async interaction => {
 
 
     // --- SLASH: DMUSER ---
+    // FIX: Don't error if .member is null (e.g. system/DM context)
     if (interaction.isChatInputCommand() && interaction.commandName === "dmuser") {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
             await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
         }
         const user = interaction.options.getUser('user');
@@ -694,6 +704,7 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
 
 
 
@@ -1060,7 +1071,7 @@ client.on('interactionCreate', async interaction => {
 
     // Admin muting XP for a user via a context menu/user command
     if (interaction.isUserContextMenuCommand?.() && interaction.commandName === "Mute XP") {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
             await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
         }
         await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
@@ -1068,6 +1079,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({content:`🔇 User ${interaction.targetUser.tag} will not earn XP until unmuted.`, ephemeral:true});
         return;
     }
+
 
     // Additional feature: context menu "Add to To-Do" on user messages
     if (interaction.isMessageContextMenuCommand?.() && interaction.commandName === "Add To-Do") {
@@ -1116,11 +1128,15 @@ const welcomeButtonRow = new ActionRowBuilder().addComponents(
 
 // Listen for admin command: update blocklist dynamically (moderation tool, slash command)
 client.on('interactionCreate', async interaction => {
+    // FIX: Guard .member on permission checks for admin DM/system
     if (
         interaction.isChatInputCommand &&
         interaction.commandName === 'settings' &&
         interaction.options?.getBoolean("autodelete")===false
     ) {
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
+            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+        }
         await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "off");
         await interaction.reply({content:"Bot reply auto-delete turned OFF.",ephemeral:true});
         return;
@@ -1129,6 +1145,9 @@ client.on('interactionCreate', async interaction => {
         interaction.commandName === 'settings' &&
         interaction.options?.getBoolean("autodelete")===true
     ) {
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
+            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+        }
         await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "on");
         await interaction.reply({content:"Bot reply auto-delete ON (where possible).",ephemeral:true});
         return;
@@ -1140,6 +1159,9 @@ client.on('interactionCreate', async interaction => {
         interaction.options?.getString &&
         interaction.options?.getString('badword')
     ) {
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
+            await interaction.reply({content:"You lack perms.",ephemeral:true}); return;
+        }
         let w = interaction.options.getString('badword').toLowerCase();
         let baseList = await readJSONFile("blocked_words.json", []);
         if (!baseList.includes(w)) {
@@ -1150,6 +1172,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 });
+
 
 client.on('messageCreate', async msg => {
     if (msg.guild) return; // only DMs
