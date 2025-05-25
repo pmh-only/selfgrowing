@@ -14,7 +14,7 @@ const DATA_DIR = "/data/";
 // Ensure data dir
 async function ensureDataDir() {
     try { await fs.stat(DATA_DIR); } 
-    catch { await fs.mkdir(DATA_DIR, { recursive: true } }
+    catch { await fs.mkdir(DATA_DIR, { recursive: true }) }
 
     // ---- BUTTON: Poll voting ----
     if (interaction.isButton() && interaction.customId.startsWith("vote_")) {
