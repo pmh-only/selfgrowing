@@ -446,11 +446,15 @@ const commands = [
     },
     {
         name: "roll",
-        description: "Roll some dice (e.g. 1d6, 2d20+5, etc)",
+        description: "Roll some dice or play a quick dice game (e.g. 1d6, 2d20+5, etc)",
         options: [
-            { name: "formula", type: 3, description: "Dice formula (e.g. 1d6+2)", required: false }
+            { name: "formula", type: 3, description: "Dice formula (e.g. 1d6+2)", required: false },
+            { name: "game", type: 3, description: "Mini-dice game: 'highest' (multiplayer, highest roll wins)", required: false, choices: [
+                { name: "Highest (multiplayer)", value: "highest" }
+            ]}
         ]
     },
+
     {
         name: "rollhist",
         description: "Show your recent dice roll history"
@@ -1074,6 +1078,49 @@ return;
 // UX improvement: more robust/clear error for empty input; add special "roll for initiative" preset
     if (interaction.isChatInputCommand() && interaction.commandName === "roll") {
         try {
+            // Additional Fun Feature: Multiplayer "highest d20" game!
+            let selectedGame = interaction.options?.getString?.("game");
+            if (selectedGame === "highest") {
+                // Let users join for a brief period, then roll and declare winner
+                // Store context using interaction.message.id or a random join key
+                const joinKey = `roll_game_highest_${Date.now()}_${Math.floor(Math.random()*10000)}`;
+                // Announce game and show join/cancel buttons
+                const joinRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`join_dicegame_${joinKey}`).setLabel("🎲 Join").setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`start_dicegame_${joinKey}`).setLabel("Start!").setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId(`cancel_dicegame_${joinKey}`).setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+                );
+                await interaction.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setTitle("🎲 Dice Game: Highest Roll")
+                            .setDescription("Want to play? Click **Join** below! When all joined, click **Start!**\nEach player rolls 1d20. Highest roll wins!\n(Only users who joined can play.)")
+                            .setFooter({text: 'Multiplayer demo: all public.'})
+                            .setColor(0x9ae6b4)
+                    ],
+                    components: [joinRow]
+                });
+                // Game state context
+                client._diceGames = client._diceGames || {};
+                client._diceGames[joinKey] = {
+                    host: interaction.user.id,
+                    started: false,
+                    users: [interaction.user.id], // host auto-joins
+                    joinMsgId: null,
+                    interactionReplyId: interaction.id,
+                    initiator: interaction.user.id
+                };
+                // Attach joinMsgId after a tick
+                setTimeout(async () => {
+                    try {
+                        let chan = await client.channels.fetch(CHANNEL_ID);
+                        let msg = (await chan.messages.fetch({ limit: 10 })).find(m=>m.interaction && m.interaction.id===interaction.id);
+                        if (msg) client._diceGames[joinKey].joinMsgId = msg.id;
+                    } catch {}
+                }, 1500);
+                return;
+            }
+
             let formula = interaction.options?.getString?.("formula");
             if (formula && formula.trim().toLowerCase() === "initiative") {
                 // Roll d20+DEX for up to 6 (prompt DMs for names/details if desired)
@@ -1160,6 +1207,7 @@ return;
         }
         return;
     }
+
 
     // --- SLASH: ROLLHIST ---
     if (interaction.isChatInputCommand() && interaction.commandName === "rollhist") {
@@ -1560,10 +1608,106 @@ client.on('messageCreate', async msg => {
 
 
 
-// --- POLL BUTTON HANDLER (button voting, retract vote) ---
+// --- POLL & DICE-GAME BUTTON HANDLERS ---
 client.on('interactionCreate', async interaction => {
+
+    // --- DICE GAME: HIGHEST MULTIPLAYER JOIN/START/CANCEL
+    if (interaction.isButton() && /^join_dicegame_|^start_dicegame_|^cancel_dicegame_/.test(interaction.customId)) {
+        const [action, , joinKey] = interaction.customId.split("_");
+        client._diceGames = client._diceGames || {};
+        const game = client._diceGames[joinKey];
+        if (!game) {
+            await interaction.reply({content: "This game has expired or was cancelled.", components: []});
+            return;
+        }
+        if (action === "join") {
+            // Only allow before start
+            if (game.started) {
+                await interaction.reply({content: "Game already started!", components: []});
+                return;
+            }
+            // User can only join once
+            if (!game.users.includes(interaction.user.id)) {
+                game.users.push(interaction.user.id);
+            }
+            // Update join embed
+            try {
+                let chan = await client.channels.fetch(CHANNEL_ID);
+                let msg = game.joinMsgId ? await chan.messages.fetch(game.joinMsgId) : null;
+                let embed = new EmbedBuilder()
+                    .setTitle("🎲 Dice Game: Highest Roll")
+                    .setDescription([
+                        "Want to play? Click **Join** below! When all joined, click **Start!**",
+                        "",
+                        `**Players Joined:**\n${game.users.map(uid => `<@${uid}>`).join(", ")}`,
+                        "",
+                        "When ready, click **Start!**"
+                    ].join('\n'))
+                    .setColor(0x9ae6b4);
+                if (msg) {
+                    await msg.edit({embeds: [embed]});
+                } else {
+                    await interaction.update({ embeds:[embed] }); // fallback
+                }
+            } catch {}
+            await interaction.reply({content: "You've joined! Wait for Start.", components: []});
+            return;
+        } else if (action === "start") {
+            if (game.started) {
+                await interaction.reply({content: "Already started!", components: []});
+                return;
+            }
+            if (!game.users?.length || (game.users.length < 2)) {
+                await interaction.reply({content: "Need at least 2 players!"});
+                return;
+            }
+            game.started = true;
+            // Roll for everyone!
+            let rolls = {};
+            for (let uid of game.users) {
+                rolls[uid] = Math.floor(Math.random()*20)+1;
+            }
+            let topScore = Math.max(...Object.values(rolls));
+            let winners = Object.entries(rolls).filter(([uid, num]) => num === topScore).map(([uid])=>uid);
+            let playerTags = {};
+            for (let uid of game.users) {
+                try { let u = await client.users.fetch(uid); playerTags[uid] = u.tag || uid; } catch { playerTags[uid] = `<@${uid}>`; }
+            }
+            let embed = new EmbedBuilder()
+                .setTitle("🎲 Dice Game: Highest Roll Results")
+                .setDescription(game.users.map(uid=>`<@${uid}> rolled **${rolls[uid]}**`).join("\n"))
+                .setFooter({text: winners.length===1 ? `Winner: ${playerTags[winners[0]]}` : `Winners: ${winners.map(w=>playerTags[w]).join(", ")}`})
+                .setColor(0xfca5a5);
+            try {
+                let chan = await client.channels.fetch(CHANNEL_ID);
+                if (game.joinMsgId && chan) {
+                    let msg = await chan.messages.fetch(game.joinMsgId);
+                    await msg.edit({embeds:[embed], components:[]});
+                }
+            } catch {}
+            await interaction.reply({embeds:[embed]});
+            delete client._diceGames[joinKey];
+            return;
+        } else if (action === "cancel") {
+            try {
+                let chan = await client.channels.fetch(CHANNEL_ID);
+                if (game.joinMsgId && chan) {
+                    let msg = await chan.messages.fetch(game.joinMsgId);
+                    await msg.edit({
+                        embeds: [new EmbedBuilder().setTitle("🎲 Dice Game Cancelled").setColor(0xcccccc)],
+                        components: []
+                    });
+                }
+            } catch {}
+            await interaction.reply({content:"Game cancelled."});
+            delete client._diceGames[joinKey];
+            return;
+        }
+    }
+
     // --- ROCK PAPER SCISSORS BUTTONS ---
     if (interaction.isButton() && /^rps_/.test(interaction.customId)) {
+
         // RPS move selection
         const user = interaction.user;
         client._rpsPending = client._rpsPending || {};
