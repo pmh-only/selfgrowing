@@ -1263,10 +1263,12 @@ client.on('interactionCreate', async interaction => {
 
 
     // POLL VOTING BUTTON HANDLING (fix: check for expired/missing poll, UX improvement)
-    if (interaction.isButton() && (/^vote_(\d)$/).test(interaction.customId) || interaction.customId==="vote_retract") {
+    // POLL VOTING BUTTON HANDLING (fix: check for expired/missing poll, UX improvement)
+    if (interaction.isButton() && ((/^vote_(\d)$/).test(interaction.customId) || interaction.customId==="vote_retract")) {
         const mid = interaction.message?.id;
         // Defensive: Ensure poll not expired/deleted from DB
-        let poll = await db.get('SELECT * FROM poll WHERE messageId=?', mid);
+        let poll;
+        try { poll = await db.get('SELECT * FROM poll WHERE messageId=?', mid); } catch { poll = null; }
         if (!poll) {
             try { await interaction.reply({content:"Poll expired or closed!"}); } catch {}
             return;
@@ -1279,7 +1281,7 @@ client.on('interactionCreate', async interaction => {
         let changed = false;
         if (interaction.customId.startsWith("vote_")) {
             let idx = parseInt(interaction.customId.split("_")[1],10);
-            if (idx<0 || idx>=opts.length) return void interaction.reply({content:"Invalid option!"});
+            if (isNaN(idx) || idx<0 || idx>=opts.length) return void interaction.reply({content:"Invalid option!"});
             if (votes[interaction.user.id]!==idx) { votes[interaction.user.id] = idx; changed=true; }
         } else if (interaction.customId==="vote_retract") {
             if (votes[interaction.user.id]!==undefined) { delete votes[interaction.user.id]; changed = true; }
@@ -1306,6 +1308,7 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
 
 
     // Admin muting XP for a user via a context menu/user command
