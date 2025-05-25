@@ -1,7 +1,7 @@
 {
-  "name": "discord-bot-advanced",
+  "name": "discord-utility-bot",
   "version": "1.0.0",
-  "description": "A large-scale single-file Discord bot with sqlite DB and advanced features.",
+  "description": "A large-scale Discord bot with moderation, fun games, and utility tools.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -12,10 +12,5 @@
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
     "humanize-duration": "^3.29.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "author": "",
-  "license": "MIT"
+  }
 }

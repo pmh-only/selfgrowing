@@ -452,6 +452,10 @@ const commands = [
         ]
     },
     {
+        name: "coinflip",
+        description: "Flip a coin for heads or tails!"
+    },
+    {
         name: "rockpaperscissors",
         description: "Play Rock Paper Scissors (vs. bot or another user)",
         options: [
@@ -459,6 +463,7 @@ const commands = [
         ]
     }
 ];
+
 
 
 
