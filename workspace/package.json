@@ -1,18 +1,16 @@
 {
-  "name": "discord-bot",
+  "name": "private-discord-bot",
   "version": "1.0.0",
-  "description": "A feature-rich private Discord bot using discord.js, sqlite, and more.",
   "type": "module",
   "main": "main.mjs",
-  "scripts": {
-    "start": "node main.mjs"
+  "description": "Private single-server Discord bot with moderation, notes, polls, todo, XP and fun features.",
+  "engines": {
+    "node": ">=18.0.0"
   },
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
+    "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
   }
 }

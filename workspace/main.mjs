@@ -948,12 +948,25 @@ client.on('interactionCreate', async interaction => {
     }
 
     // --- SLASH: ROLL ---
+// UX improvement: more robust/clear error for empty input; add special "roll for initiative" preset
     if (interaction.isChatInputCommand() && interaction.commandName === "roll") {
-        let formula = interaction.options?.getString?.("formula") || "1d6";
-        // '2d6+4', 'd20-1', '3d12', etc.
-        // Parse: <num>d<sides>[+/-mod]
+        let formula = interaction.options?.getString?.("formula");
+        if (formula && formula.trim().toLowerCase() === "initiative") {
+            // Roll d20+DEX for up to 6 (prompt DMs for names/details if desired)
+            let rolls = [];
+            for (let i=0;i<6;i++) rolls.push({num: Math.floor(Math.random()*20)+1, name: `Player ${i+1}`});
+            let embed = new EmbedBuilder().setTitle("Initiative Rolls")
+              .setDescription(rolls.map(r=>`**${r.name}:** ${r.num}`).join("\n"))
+              .setColor(0xbada55);
+            await interaction.reply({embeds:[embed], ephemeral:true});
+            return;
+        }
+        formula = formula || "1d6";
+        formula = formula.trim();
+        if (!formula) formula = "1d6";
+        // Parse: <num>d<sides>[+/-mod][optional spaces]
         let m = formula.replace(/\s+/g,"").toLowerCase().match(/^(\d*)d(\d+)((?:[+-]\d+)*)$/);
-        if (!m) return void interaction.reply({content:"Invalid dice formula. Use e.g. 1d20, 2d6+3 (max 100 dice, sides 2-1000).", ephemeral:true});
+        if (!m) return void interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1`.", ephemeral:true});
 
         let num = parseInt(m[1] || "1",10);
         let sides = parseInt(m[2],10);
@@ -968,9 +981,14 @@ client.on('interactionCreate', async interaction => {
         let rolls = [];
         for (let i=0;i<num;i++) rolls.push(Math.floor(Math.random()*sides)+1);
         let sum = rolls.reduce((a,b)=>a+b,0) + modifier;
-        let desc = `🎲 Rolling: \`${num}d${sides}${modifier? (modifier>0?`+${modifier}`:modifier):""}\`\nResults: [${rolls.join(", ")}]`
-            + (modifier ? ` ${modifier>0?"+":""}${modifier}` : "") + `\nTotal: **${sum}**`;
+        let desc = `🎲 Rolling: \`${num}d${sides}${modifier? (modifier>0?`+${modifier}`:modifier):""}\`  \nResults: [${rolls.join(", ")}]`
+            + (modifier ? ` ${modifier>0?"+":""}${modifier}` : "") + `\n**Total:** \`${sum}\``;
         
+        // UX: If many dice, summarize highlights
+        if (num > 10) {
+            desc += `\nTop rolls: ${[...rolls].sort((a,b)=>b-a).slice(0,5).join(", ")}`;
+            desc += `\nLowest: ${[...rolls].sort((a,b)=>a-b).slice(0,3).join(", ")}`;
+        }
         // Flavor message for nat 1 or max, d20
         if (sides===20 && num===1) {
             if (rolls[0]===20)
@@ -983,6 +1001,7 @@ client.on('interactionCreate', async interaction => {
         ]});
         return;
     }
+
 
 
 
