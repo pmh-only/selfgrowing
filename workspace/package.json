@@ -1,7 +1,6 @@
 {
-  "name": "discord-bot",
+  "name": "discordjs-singlefile-bot",
   "version": "1.0.0",
-  "description": "Large-scale private Discord.js bot with public user commands and data, featuring persistent /data directory and sqlite",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -10,7 +9,10 @@
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.6",
+    "sqlite3": "^5.1.7",
     "humanize-duration": "^3.29.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

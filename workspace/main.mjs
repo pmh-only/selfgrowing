@@ -1687,9 +1687,10 @@ return;
                 .setLabel("👎 Downvote")
                 .setStyle(ButtonStyle.Danger)
         );
-        await interaction.reply({embeds: [embed], components: [row]});
+        await interaction.reply({embeds: [embed], components: [row], allowedMentions: { parse: [] }});
         return;
     }
+
     if (interaction.isChatInputCommand() && interaction.commandName === "suggestions") {
         // List all open suggestions, mark those handled with [HANDLED], UX improvement
         let recs = await db.all(
