@@ -582,7 +582,11 @@ const contextCommands = [
         options: [
             { name: "opponent", type: 6, description: "User to play against (optional)", required: false }
         ]
-    }
+    },
+    {
+            name: "dicewarleaderboard",
+            description: "Dice War game leaderboard"
+        }
 ];
 
 
@@ -2830,20 +2834,6 @@ try {
     }
 } catch {}
 
-
-/**
- * Register additional Dice War leaderboard slash command.
- */
-try {
-    const restDiceWar = new REST({version: '10'}).setToken(TOKEN);
-    restDiceWar.put(
-        Routes.applicationGuildCommands(client.application.id, GUILD_ID),
-        {body:[{
-            name: "dicewarleaderboard",
-            description: "Dice War game leaderboard"
-        }]}
-    );
-} catch(e){}
 
  // --- Startup reminder boot ---
 // Show top 5 most upvoted messages feature
