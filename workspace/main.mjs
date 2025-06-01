@@ -426,6 +426,16 @@ const contextCommands = [
             name: "joke",
             description: "Get a random programming or general joke for fun"
         },
+        // --- ADDITIONAL FEATURE: ANNOUNCE COMMAND REGISTRATION ---
+        {
+            name: "announce",
+            description: "Post a public announcement in the main channel",
+            options: [
+                { name: "title", type: 3, description: "Announcement title", required: true },
+                { name: "message", type: 3, description: "Main announcement message", required: true }
+            ]
+        },
+
 
 
 
@@ -1714,6 +1724,43 @@ return;
         }
         return;
     }
+    // --- ADDITIONAL FEATURE: ANNOUNCE COMMAND ---
+    // Allow any user to post an announcement in the main channel as an embed (public utility)
+    if (interaction.isChatInputCommand() && interaction.commandName === 'announce') {
+        // Only allow in main channel (single-guild restriction)
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({content: "Announcements are public in the main channel. Use this command there!", allowedMentions: { parse: [] }});
+            return;
+        }
+        let title = interaction.options.getString('title')?.substring(0, 120).trim();
+        let message = interaction.options.getString('message')?.substring(0, 900).trim();
+        if (!title || !message) {
+            await interaction.reply({content: "You must provide both a title and a message!", allowedMentions: { parse: [] }});
+            return;
+        }
+        const embed = new EmbedBuilder()
+            .setTitle("📢 " + title)
+            .setDescription(message)
+            .setFooter({ text: `Announced by ${interaction.user.username}` })
+            .setColor(0xeab308)
+            .setTimestamp();
+        // Announcement as a normal message (no ephemeral!)
+        await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
+        // UX: Save to local history for reference (optional, keep only recent 20 for space)
+        try {
+            let ann = await readJSONFile("announcements.json", []);
+            ann.push({
+                title,
+                message,
+                by: interaction.user.id,
+                at: Date.now()
+            });
+            if (ann.length > 20) ann = ann.slice(-20);
+            await saveJSONFile("announcements.json", ann);
+        } catch {}
+        return;
+    }
+
 
     if (interaction.isChatInputCommand() && interaction.commandName === "suggest") {
         // Suggestion feature: add suggestion to db and post it for voting
