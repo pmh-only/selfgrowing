@@ -42,6 +42,7 @@ always remember following restrictions:
 * make all user data to public. do not use private data
 * do not use plain text command. use slash command, message component, modal and embed
 * for demonstration purpose, all user is admin. so you can use admin features without checking user permission
+* do not use every kind of mentions like user mention, role mention or everyone mention. use username.
 
 output a string of SEARCH/REPLACE block(s) which will be applied to the given file.
 Your SEARCH/REPLACE blocks string must be formatted as follows:
