@@ -1,31 +1,18 @@
 {
-  "name": "discord-singlefile-bot",
+  "name": "discord-bot-large-scale",
   "version": "1.0.0",
-  "description": "A large-scale single-file Discord bot with SQLite, moderation, games, and public UX. Docker & Linux ready.",
-  "main": "main.mjs",
+  "description": "Large scale Discord bot with SQLite and advanced user tools",
   "type": "module",
+  "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
+  "author": "PrivateBot",
+  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
+    "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "discord",
-    "bot",
-    "sqlite",
-    "single-file",
-    "docker",
-    "moderation",
-    "game",
-    "public"
-  ],
-  "author": "Your Name",
-  "license": "MIT"
+  }
 }

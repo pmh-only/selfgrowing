@@ -421,6 +421,12 @@ const contextCommands = [
                 { name: 'user', type: 6, description: "User to clear warnings for", required: true }
             ]
         },
+        // --- NEW FEATURE: JOKE COMMAND ---
+        {
+            name: "joke",
+            description: "Get a random programming or general joke for fun"
+        },
+
 
 
 
@@ -807,6 +813,32 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    if (interaction.isChatInputCommand && interaction.commandName === "joke") {
+        // Provide fun programming/general joke using static list
+        const jokes = [
+            "Why do programmers prefer dark mode? Because light attracts bugs!",
+            "How many programmers does it take to change a light bulb? None. It's a hardware problem!",
+            "Why do Java developers wear glasses? Because they can't C#.",
+            "To understand what recursion is, you must first understand recursion.",
+            "A SQL query walks into a bar, walks up to two tables and asks: 'Can I join you?'",
+            "Why did the function return early? Because it had a date with an exception.",
+            "Real programmers count from 0.",
+            "There are 10 types of people: those who understand binary, and those who don’t.",
+            "Why couldn’t the leopard play hide and seek? Because he was always spotted.",
+            "What do you call 8 hobbits? A hobbyte.",
+            "Why did the scarecrow win an award? Because he was outstanding in his field.",
+            "Why couldn't the bicycle stand up by itself? It was two-tired."
+        ];
+        const joke = jokes[Math.floor(Math.random() * jokes.length)];
+        const embed = new EmbedBuilder()
+            .setTitle("😂 Random Joke")
+            .setDescription(joke)
+            .setColor(0xfff200)
+            .setFooter({ text: "Submit more fun jokes with /feedback!" });
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
+
     if (interaction.isChatInputCommand && interaction.commandName === "feedbacklist") {
         // Show most recent 6 feedback entries, highest voted first
         let recs = await db.all(
@@ -830,6 +862,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({embeds: embeds, allowedMentions: { parse: [] }});
         return;
     }
+
 
     // --- FEEDBACK BOARD BUTTONS ---
     if (interaction.isButton() && (/^fb_(up|down)_\d+$/.test(interaction.customId))) {
