@@ -438,6 +438,17 @@ const contextCommands = [
                 { name: "message", type: 3, description: "Main announcement message", required: true }
             ]
         },
+        // --- ADDITIONAL FEATURE: QUOTEADD (register missing) ---
+        {
+            name: "quoteadd",
+            description: "Add a quote to the quote board (author, text, [category]).",
+            options: [
+                { name: "author_tag", type: 3, description: "Who to credit for this quote (username#tag)", required: true },
+                { name: "content", type: 3, description: "The quote or message", required: true },
+                { name: "category", type: 3, description: "Optional category/tag" }
+            ]
+        },
+
 
 
 

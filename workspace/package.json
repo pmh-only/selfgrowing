@@ -1,8 +1,8 @@
 {
-  "name": "discord-private-bot",
+  "name": "discordjs-largebot",
   "version": "1.0.0",
+  "description": "Large-scale Discord bot for single channel, public data, with slash commands and fun features.",
   "type": "module",
-  "description": "A private Discord bot with productivity and fun tools for a single server/channel setup.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
@@ -17,14 +17,6 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": [
-    "discord",
-    "bot",
-    "private",
-    "sqlite",
-    "productivity",
-    "games"
-  ],
-  "author": "Your Name",
+  "author": "anon",
   "license": "MIT"
 }
