@@ -1,9 +1,9 @@
 {
-  "name": "large-scale-discordjs-bot",
+  "name": "discord-private-bot",
   "version": "1.0.0",
   "type": "module",
+  "description": "A private Discord bot with productivity and fun tools for a single server/channel setup.",
   "main": "main.mjs",
-  "description": "A large-scale Discord.js bot with advanced features and public user tools.",
   "scripts": {
     "start": "node main.mjs"
   },
@@ -19,12 +19,11 @@
   },
   "keywords": [
     "discord",
-    "discord-bot",
     "bot",
-    "discord.js",
+    "private",
     "sqlite",
     "productivity",
-    "fun"
+    "games"
   ],
   "author": "Your Name",
   "license": "MIT"
