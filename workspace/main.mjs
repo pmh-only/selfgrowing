@@ -353,7 +353,14 @@ async function scheduleReminders(client) {
             // All reminders sent to public channel now, per restrictions. No DM.
             const chan = client.channels.cache.get(CHANNEL_ID);
             if (chan?.isTextBased && chan?.send) {
-                await chan.send(`<@${next.userId}>: [⏰ Reminder] ${next.content}`);
+                // Remove mention: use only username so no ping!
+            let uname;
+            try {
+                let userObj = await client.users.fetch(next.userId);
+                uname = userObj.username;
+            } catch { uname = next.userId; }
+            await chan.send(`${uname}: [⏰ Reminder] ${next.content}`);
+
             }
             await db.run("DELETE FROM reminders WHERE id = ?", next.id);
             // UX: Add to sent reminders log
@@ -2064,7 +2071,8 @@ return;
         const embed = new EmbedBuilder()
             .setTitle("💡 New Suggestion Pending Review")
             .setDescription(`> ${text.slice(0,800)}`)
-            .setFooter({ text: `By <@${interaction.user.id}> | Use /suggestions to vote or comment!` })
+            // Remove mention from footer (use username instead)
+            .setFooter({ text: `By ${interaction.user.username} | Use /suggestions to vote or comment!` })
             .setColor(0x80deea)
             .setTimestamp();
         // Post quick up/down vote buttons for feedback
@@ -2081,6 +2089,7 @@ return;
         await interaction.reply({embeds: [embed], components: [row], allowedMentions: { parse: [] }});
         return;
     }
+
 
     if (interaction.isChatInputCommand() && interaction.commandName === "suggestions") {
         // List all open suggestions, mark those handled with [HANDLED], UX improvement
@@ -2103,22 +2112,33 @@ return;
                 down: (down[0]?.n || 0)
             });
         }
-        let embeds = entries.map((s, idx) =>
-            new EmbedBuilder()
-                .setTitle(`${s.handled ? "✅ [HANDLED]" : ""} Suggestion #${s.id}${s.category?` (${s.category})`:""}`)
-                .setDescription([
-                    `> ${s.suggestion}`,
-                    `By: <@${s.userId}>`,
-                    `Status: \`${s.status}\`${s.handled ? " (Marked as handled)" : ""}`,
-                    `👍 ${s.up} | 👎 ${s.down}`
-                ].join("\n"))
-                .setColor(s.handled ? 0x34d399 : 0xf9a825)
-                .setFooter({ text: `Use /suggest to add your own!` })
-                .setTimestamp(s.createdAt)
-        );
-        await interaction.reply({embeds: embeds.slice(0,3)});
+        let embeds = [];
+        // Fetch usernames upfront to remove mention in description
+        let userNameCache = {};
+        for (const e of entries.slice(0,3)) {
+            let uname = e.userId;
+            try {
+                let uobj = await client.users.fetch(e.userId);
+                uname = uobj.username;
+            } catch {}
+            embeds.push(
+                new EmbedBuilder()
+                    .setTitle(`${e.handled ? "✅ [HANDLED]" : ""} Suggestion #${e.id}${e.category?` (${e.category})`:""}`)
+                    .setDescription([
+                        `> ${e.suggestion}`,
+                        `By: ${uname}`,
+                        `Status: \`${e.status}\`${e.handled ? " (Marked as handled)" : ""}`,
+                        `👍 ${e.up} | 👎 ${e.down}`
+                    ].join("\n"))
+                    .setColor(e.handled ? 0x34d399 : 0xf9a825)
+                    .setFooter({ text: `Use /suggest to add your own!` })
+                    .setTimestamp(e.createdAt)
+            );
+        }
+        await interaction.reply({embeds: embeds});
         return;
     }
+
 
 
 
@@ -3637,10 +3657,14 @@ client.on('interactionCreate', async interaction => {
         let down = await db.get(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='suggest:down'`, "suggestion_" + sId);
         await db.run(`UPDATE suggestion SET votes=? WHERE id=?`, (up.n - down.n), sId);
         // UX: update suggestion embed if in channel
-        await interaction.reply({content: `Thank you for your ${type === 'up' ? '👍 upvote' : '👎 downvote'}!`, allowedMentions: { parse: [] }});
+        await interaction.reply({
+            content: `Thank you for your ${type === 'up' ? '👍 upvote' : '👎 downvote'}!`,
+            allowedMentions: { parse: [] }
+        });
 
         return;
     }
+
 
     // NEW FEATURE: Upvote/Downvote Leaderboard via message context menu button
     if (interaction.isButton() && (interaction.customId === "upvote_leaderboard" || interaction.customId === "downvote_leaderboard")) {

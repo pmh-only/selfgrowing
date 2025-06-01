@@ -1,7 +1,7 @@
 {
-  "name": "discord-productivity-bot",
+  "name": "discord-bot-large",
   "version": "1.0.0",
-  "description": "Large single-file Discord.js bot with slash commands, moderation, games, and productivity features.",
+  "description": "Large scale Discord bot with feature-rich slash commands, moderation, games, and utilities",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -9,13 +9,12 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
+    "sqlite": "5.1.1",
     "sqlite3": "^5.1.6",
-    "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^2.6.12"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "license": "MIT"
+  }
 }
