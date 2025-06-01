@@ -1,7 +1,7 @@
 {
-  "name": "discord-productivity-bot",
+  "name": "discord-large-bot",
   "version": "1.0.0",
-  "description": "A large-scale productivity and fun Discord bot for single-channel, private use with advanced features, using discord.js v14, sqlite, and public user data.",
+  "description": "Large scale Discord bot with admin tools, moderation, games, and user tools",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -9,13 +9,21 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
+    "sqlite3": "^5.1.7",
     "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "",
+  "keywords": [
+    "discord",
+    "bot",
+    "moderation",
+    "games",
+    "admin",
+    "sqlite"
+  ],
+  "author": "Your Name",
   "license": "MIT"
 }

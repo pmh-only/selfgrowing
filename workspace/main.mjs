@@ -1017,7 +1017,8 @@ return;
             const txt = interaction.options.getString('content').substring(0, 500);
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)',
                 interaction.user.id, txt, Date.now());
-            await interaction.reply({content:'📝 Note saved! (All notes are public in-channel; use `/todo` for personal items)'});
+            await interaction.reply({content:'📝 Note saved! (All notes are public in-channel; use `/todo` for personal items)', allowedMentions: { parse: [] }});
+
         } else if (interaction.options.getSubcommand() === 'list') {
             const rows = await db.all('SELECT id, note, timestamp, userId FROM notes ORDER BY id DESC LIMIT 10');
             if (rows.length === 0) await interaction.reply({content:"No notes yet."});
@@ -1026,17 +1027,20 @@ return;
                   .setTitle("Last 10 Public Notes")
                   .setDescription(rows.map((r,i) => `**[${rows.length-i}]** <@${r.userId}>: ${r.note} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
                   .setColor(0x80ecec);
-                await interaction.reply({embeds:[embed]});
+                await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
             }
+
         } else if (interaction.options.getSubcommand() === 'delete') {
             const idx = interaction.options.getInteger('number');
             const allRows = await db.all('SELECT id, userId FROM notes ORDER BY id DESC LIMIT 10');
             if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!"});
             // Allow any user to delete any note for public UX (demonstration mode)
             await db.run('DELETE FROM notes WHERE id=?', allRows[idx-1].id);
-            await interaction.reply({content:"🗑️ Note deleted."});
+            await interaction.reply({content:"🗑️ Note deleted.", allowedMentions: { parse: [] }});
+
         } else if (interaction.options.getSubcommand() === "pin") {
-            await interaction.reply({content:"⚠️ To pin notes, please use `/todo add` with the note content! (To-Do is now public)"});
+            await interaction.reply({content:"⚠️ To pin notes, please use `/todo add` with the note content! (To-Do is now public)", allowedMentions: { parse: [] }});
+
         } else if (interaction.options.getSubcommand() === "pinned") {
             const todos = await db.all("SELECT content, done, ts, userId FROM todo_entries ORDER BY ts DESC");
             if (!todos.length)
@@ -1045,7 +1049,8 @@ return;
                 .setTitle("📝 Pinned Notes (Public To-Do List)")
                 .setDescription(todos.slice(0,10).map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** <@${t.userId}>: ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
                 .setColor(0xfecf6a);
-            await interaction.reply({embeds:[embed]});
+            await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
+
         } else if (interaction.options.getSubcommand() === "search") {
             const query = interaction.options.getString("query").toLowerCase();
             const rows = await db.all('SELECT note, timestamp, userId FROM notes ORDER BY id DESC LIMIT 50');
@@ -1055,7 +1060,8 @@ return;
                 .setTitle(`🔎 Notes matching "${query}"`)
                 .setDescription(matches.slice(0,10).map((n,i)=>`**[${i+1}]** <@${n.userId}>: ${n.note} _(at <t:${Math.floor(n.timestamp/1000)}:f>)_`).join("\n"))
                 .setColor(0x4a90e2);
-            await interaction.reply({embeds:[embed]});
+            await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
+
         }
         return;
     }
@@ -1081,19 +1087,22 @@ return;
             if (fuzzyMatch.length)
                 addMsg += `\n*Related incomplete to-dos:*\n - `+fuzzyMatch.slice(0,2).join('\n - ');
             await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", interaction.user.id, txt, Date.now());
-            await interaction.reply({content:addMsg});
+            await interaction.reply({content:addMsg, allowedMentions: { parse: [] }});
+
         } else if (sub === "complete") {
             let idx = interaction.options.getInteger('number');
             let rows = await db.all("SELECT id, content FROM todo_entries ORDER BY ts DESC LIMIT 15");
             if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
             await db.run("UPDATE todo_entries SET done=1 WHERE id=?", rows[idx-1].id);
-            await interaction.reply({content:`✅ Marked "${rows[idx-1].content}" as done.`});
+            await interaction.reply({content:`✅ Marked "${rows[idx-1].content}" as done.`, allowedMentions: { parse: [] }});
+
         } else if (sub === "remove") {
             let idx = interaction.options.getInteger('number');
             let rows = await db.all("SELECT id FROM todo_entries ORDER BY ts DESC LIMIT 15");
             if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
             await db.run("DELETE FROM todo_entries WHERE id=?", rows[idx-1].id);
-            await interaction.reply({content:"🗑️ To-do removed."});
+            await interaction.reply({content:"🗑️ To-do removed.", allowedMentions: { parse: [] }});
+
         } else if (sub === "list") {
             let todos = await db.all("SELECT content, done, ts, userId FROM todo_entries ORDER BY ts DESC");
             if (!todos.length) return void interaction.reply({content:"To-do list is empty!"});
@@ -1105,7 +1114,8 @@ return;
             // New UX: count completed and incomplete
             let doneCount = todos.filter(t=>t.done).length;
             embed.setFooter({text:`${todos.length} total, ${doneCount} completed, ${todos.length-doneCount} remaining`});
-            await interaction.reply({embeds:[embed]});
+            await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
+
         } else if (sub === "edit") {
             let idx = interaction.options.getInteger('number');
             let newContent = interaction.options.getString('content').substring(0, 300);
@@ -1114,7 +1124,8 @@ return;
             let todoId = rows[idx-1].id;
             let oldContent = rows[idx-1].content;
             await db.run("UPDATE todo_entries SET content=?, ts=? WHERE id=?", newContent, Date.now(), todoId);
-            await interaction.reply({content: `✏️ To-Do item #${idx} updated.\nBefore: "${oldContent}"\nAfter: "${newContent}"`});
+            await interaction.reply({content: `✏️ To-Do item #${idx} updated.\nBefore: "${oldContent}"\nAfter: "${newContent}"`, allowedMentions: { parse: [] }});
+
         }
         return;
     }
@@ -1134,10 +1145,11 @@ return;
         const txt = interaction.options.getString('message');
         try {
             await user.send(`[Message from admin]\n${txt}`);
-            await interaction.reply({content:`Sent DM to ${user.tag}`});
+            await interaction.reply({content:`Sent DM to ${user.tag}`, allowedMentions: { parse: [] }});
         } catch {
-            await interaction.reply({content:"I couldn't DM this user (maybe DM closed)."});
+            await interaction.reply({content:"I couldn't DM this user (maybe DM closed).", allowedMentions: { parse: [] }});
         }
+
         return;
     }
 
@@ -1169,7 +1181,8 @@ return;
             }
           } catch{}
         }, dur);
-        await interaction.reply({content:`⏳ Timer **"${name}"** started for ${humanizeMs(dur)}! I will alert **in this channel** when done.`});
+        await interaction.reply({content:`⏳ Timer **"${name}"** started for ${humanizeMs(dur)}! I will alert **in this channel** when done.`, allowedMentions: { parse: [] }});
+
         return;
     }
     if (interaction.isChatInputCommand() && interaction.commandName === "timers") {
@@ -1199,7 +1212,8 @@ return;
         if (delay > 7*24*60*60*1000) return void interaction.reply({content:"Max is 7d.",ephemeral:true});
         await db.run('INSERT INTO reminders(userId, content, remindAt) VALUES (?,?,?)',
             interaction.user.id, content, Date.now() + delay);
-        await interaction.reply({content:`⏰ Reminder set! I'll remind **in the main channel** in ${humanizeMs(delay)}.`});
+        await interaction.reply({content:`⏰ Reminder set! I'll remind **in the main channel** in ${humanizeMs(delay)}.`, allowedMentions: { parse: [] }});
+
         scheduleReminders(client);
         return;
     }
@@ -1214,7 +1228,8 @@ return;
         const reason = interaction.options.getString('reason').substring(0,300);
         await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
             user.id, reason, Date.now());
-        await interaction.reply({content:`⚠️ Warned ${user.tag}`});
+        await interaction.reply({content:`⚠️ Warned ${user.tag}`, allowedMentions: { parse: [] }});
+
         try {
             await user.send(`[⚠️ Warning] From admins: ${reason}`);
         } catch{}
@@ -1226,7 +1241,8 @@ return;
     if (interaction.isChatInputCommand() && interaction.commandName === 'warnings') {
         const tgt = interaction.options.getUser('user');
         const rows = await db.all('SELECT reason, timestamp FROM warnings WHERE userId=? ORDER BY id DESC LIMIT 10', tgt.id);
-        if (rows.length === 0) await interaction.reply({content:"No warnings for this user!"});
+        if (rows.length === 0) await interaction.reply({content:"No warnings for this user!", allowedMentions: { parse: [] }});
+
         else {
             const embed = new EmbedBuilder()
                 .setTitle(`${tgt.tag}'s last 10 warnings`)
@@ -1253,10 +1269,11 @@ return;
                 let msg = await chan.messages.fetch(msgId);
                 try { await msg.reactions.removeAll(); } catch {}
             } catch {}
-            await interaction.reply({content:"All thumbs up/down reactions cleared from that message (leaderboards should update)."});
+            await interaction.reply({content:"All thumbs up/down reactions cleared from that message (leaderboards should update).", allowedMentions: { parse: [] }});
         } catch(e) {
-            await interaction.reply({content:"Failed to clear reactions. Check the message ID and try again."});
+            await interaction.reply({content:"Failed to clear reactions. Check the message ID and try again.", allowedMentions: { parse: [] }});
         }
+
         return;
     }
 
@@ -1265,7 +1282,8 @@ return;
         // Show public log of all sent reminders, newest first
         const rows = await db.all('SELECT userId, content, remindAt, sentAt FROM reminders_log ORDER BY sentAt DESC LIMIT 20');
         if (!rows.length) {
-            await interaction.reply({content: 'No reminders have been sent yet!'});
+            await interaction.reply({content: 'No reminders have been sent yet!', allowedMentions: { parse: [] }});
+
             return;
         }
         // Group by user and show details
@@ -1292,7 +1310,8 @@ return;
             return void interaction.reply({content:`Please wait before purging again for safety. (${Math.ceil((60000-(Date.now()-lastT))/1000)}s left)`});
         let n = interaction.options.getInteger('count');
         if (n<1 || n>50) {
-            await interaction.reply({content:'Count must be 1-50.'});
+            await interaction.reply({content:'Count must be 1-50.', allowedMentions: { parse: [] }});
+
             return;
         }
         // Confirm visual with button
@@ -1323,7 +1342,8 @@ return;
         try {
             const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', interaction.user.id);
             if (!row) {
-                await interaction.reply({content:'No XP on record.'});
+                await interaction.reply({content:'No XP on record.', allowedMentions: { parse: [] }});
+
             } else {
                 let embed = new EmbedBuilder()
                     .setTitle("Your XP & Level")
@@ -1590,7 +1610,8 @@ return;
             ], components: [rowButtons]});
         } catch (e) {
             try {
-                await interaction.reply({content:"An error occurred while rolling dice."});
+                await interaction.reply({content:"An error occurred while rolling dice.", allowedMentions: { parse: [] }});
+
             } catch {}
         }
         return;
@@ -1604,7 +1625,8 @@ return;
             let hist = [];
             try { hist = await readJSONFile("roll_history.json", []); } catch {}
             hist = hist.filter(r => r.userId === interaction.user.id).slice(-10).reverse();
-            if (!hist.length) return void interaction.reply({content:"No dice roll history found."});
+            if (!hist.length) return void interaction.reply({content:"No dice roll history found.", allowedMentions: { parse: [] }});
+
             let lines = hist.map((h,i) => `**${i+1}.** \`${h.formula}\` = ${h.resultMsg} _(at <t:${Math.floor(h.at/1000)}:t>)_`);
             let embed = new EmbedBuilder()
                 .setTitle(`${interaction.user.tag}'s Last ${hist.length} Dice Rolls`)
@@ -1612,7 +1634,8 @@ return;
                 .setColor(0x7dd3fc);
             await interaction.reply({embeds:[embed]});
         } catch (e) {
-            await interaction.reply({content:"Failed to show roll history."});
+            await interaction.reply({content:"Failed to show roll history.", allowedMentions: { parse: [] }});
+
         }
         return;
     }
@@ -1622,7 +1645,8 @@ return;
         try {
             let histAll = [];
             try { histAll = await readJSONFile("roll_history.json", []); } catch {}
-            if (!histAll.length) return void interaction.reply({content:"No roll stats yet!"});
+            if (!histAll.length) return void interaction.reply({content:"No roll stats yet!", allowedMentions: { parse: [] }});
+
             // Compute: who rolled the highest total; who rolled most; average roll per user (by sum of totals/number)
             let stats = {}, users = {};
             for (let r of histAll) {
@@ -1656,7 +1680,8 @@ return;
                 ]
             });
         } catch (e) {
-            await interaction.reply({content:"Failed to compute roll stats."});
+            await interaction.reply({content:"Failed to compute roll stats.", allowedMentions: { parse: [] }});
+
         }
         return;
     }
@@ -1667,15 +1692,18 @@ return;
     if (interaction.isChatInputCommand() && interaction.commandName === "dicewar") {
         const opponent = interaction.options.getUser("opponent");
         if (!opponent || opponent.bot || opponent.id === interaction.user.id) {
-            await interaction.reply({content: "Please challenge a real user (not yourself/bot)!"});
+            await interaction.reply({content: "Please challenge a real user (not yourself/bot)!", allowedMentions: { parse: [] }});
+
             return;
         }
         if (client._ongoingDiceWar && client._ongoingDiceWar[interaction.user.id]) {
-            await interaction.reply({ content: `You already have a pending Dice War challenge! Wait for it to finish.` });
+            await interaction.reply({ content: `You already have a pending Dice War challenge! Wait for it to finish.`, allowedMentions: { parse: [] } });
+
             return;
         }
         if (client._ongoingDiceWar && client._ongoingDiceWar[opponent.id]) {
-            await interaction.reply({ content: `That user is already in a Dice War! Try again later.` });
+            await interaction.reply({ content: `That user is already in a Dice War! Try again later.`, allowedMentions: { parse: [] } });
+
             return;
         }
         // Store challenge context (5min expiry)
@@ -1866,9 +1894,11 @@ return;
                 userTags[row.userId] = tagRec && tagRec.tag ? tagRec.tag : row.userId;
             }
         } catch {}
-        if (!rows.length) return void interaction.reply({content:"Leaderboard empty.",ephemeral:true});
+        if (!rows.length) return void interaction.reply({content:"Leaderboard empty.",ephemeral:true, allowedMentions: { parse: [] }});
+
         let msg = rows.map((r,i)=>`**#${i+1}: <@${r.userId}> (${userTags[r.userId] || r.userId}) — Level ${r.level} (${r.xp} XP)**`).join('\n');
-        await interaction.reply({content:msg,ephemeral:false, allowedMentions: { users: [] }});
+        await interaction.reply({content:msg,ephemeral:false, allowedMentions: { parse: [] }});
+
         return;
     }
 
@@ -2011,11 +2041,13 @@ client.on('messageCreate', async msg => {
                 client._lastSticky = Date.now();
                 try {
                     let m = await msg.channel.send({
-                        content: `__**Sticky Message**__\n${stickyRec.message}\n*(set by <@${stickyRec.setBy}>)*`
+                        content: `__**Sticky Message**__\n${stickyRec.message}\n*(set by <@${stickyRec.setBy}>)*`,
+                        allowedMentions: { parse: [] }
                     });
                     setTimeout(()=> m.delete().catch(()=>{}), 60000*6); // autodelete in 6 min
                 } catch {}
             }
+
         }
     }
 
@@ -2039,7 +2071,8 @@ client.on('messageCreate', async msg => {
         await db.run('INSERT OR REPLACE INTO xp(userId, xp, level) VALUES (?,?,?)',
             msg.author.id, xpNow, lvlNow);
         if (lvlNow > row.level)
-            await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`});
+            await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`, allowedMentions: { parse: [] }});
+
     }
 
     // --- Log all messages for moderation/stats ---
@@ -2081,7 +2114,8 @@ client.on('messageCreate', async msg => {
                 msg.author.id
             );
             await msg.delete().catch(()=>{});
-            await msg.reply({content:"🚫 Message removed for inappropriate language."});
+            await msg.reply({content:"🚫 Message removed for inappropriate language.", allowedMentions: { parse: [] }});
+
             await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
                 msg.author.id, "Inappropriate language", Date.now());
         }
@@ -2232,7 +2266,8 @@ client.on('interactionCreate', async interaction => {
                     ]
                 });
             } catch (e) {
-                await interaction.reply({content:"Failed to compute roll stats."});
+                await interaction.reply({content:"Failed to compute roll stats.", allowedMentions: { parse: [] }});
+
             }
             return;
         }
@@ -2683,7 +2718,8 @@ client.on('interactionCreate', async interaction => {
         // Permissions not required - all users are 'admin' for demonstration
         await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
             interaction.targetUser.id, "XP MUTE (admin muted)", Date.now());
-        await interaction.reply({content:`🔇 User ${interaction.targetUser.tag} will not earn XP until unmuted.`});
+        await interaction.reply({content:`🔇 User ${interaction.targetUser.tag} will not earn XP until unmuted.`, allowedMentions: { parse: [] }});
+
         return;
     }
 
@@ -2694,7 +2730,8 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isMessageContextMenuCommand?.() && interaction.commandName === "Add To-Do") {
         let msg = interaction.targetMessage;
         await db.run("INSERT INTO todo_entries(userId, content, done, ts) VALUES (?,?,0,?)", interaction.user.id, msg.content.substring(0,300), Date.now());
-        await interaction.reply({content:"Added message as a to-do in the public To-Do list. Use `/todo list` to view!"});
+        await interaction.reply({content:"Added message as a to-do in the public To-Do list. Use `/todo list` to view!", allowedMentions: { parse: [] }});
+
         return;
     }
 
@@ -2765,7 +2802,8 @@ client.on('interactionCreate', async interaction => {
         let down = await db.get(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='suggest:down'`, "suggestion_" + sId);
         await db.run(`UPDATE suggestion SET votes=? WHERE id=?`, (up.n - down.n), sId);
         // UX: update suggestion embed if in channel
-        await interaction.reply({content: `Thank you for your ${type === 'up' ? '👍 upvote' : '👎 downvote'}!`});
+        await interaction.reply({content: `Thank you for your ${type === 'up' ? '👍 upvote' : '👎 downvote'}!`, allowedMentions: { parse: [] }});
+
         return;
     }
 
@@ -2786,7 +2824,8 @@ client.on('interactionCreate', async interaction => {
             `, [reactionStr]);
         } catch {}
         if (!votes || !votes.length) {
-            await interaction.reply({content: `No ${isUp ? "upvoted" : "downvoted"} messages yet!`});
+            await interaction.reply({content: `No ${isUp ? "upvoted" : "downvoted"} messages yet!`, allowedMentions: { parse: [] }});
+
             return;
         }
         let embed = new EmbedBuilder()
@@ -2901,7 +2940,8 @@ client.on('interactionCreate', async interaction => {
     ) {
         // Permissions not required - all users are 'admin' for demonstration
         await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "off");
-        await interaction.reply({content:"Bot reply auto-delete turned OFF."});
+        await interaction.reply({content:"Bot reply auto-delete turned OFF.", allowedMentions: { parse: [] }});
+
         return;
     } else if (
         typeof interaction.isChatInputCommand === "function" &&
@@ -2911,7 +2951,8 @@ client.on('interactionCreate', async interaction => {
     ) {
         // Permissions not required - all users are 'admin' for demonstration
         await fs.writeFile(DATA_DIR + "autodelete_botreplies.txt", "on");
-        await interaction.reply({content:"Bot reply auto-delete ON (where possible)."});
+        await interaction.reply({content:"Bot reply auto-delete ON (where possible).", allowedMentions: { parse: [] }});
+
         return;
     }
     // Example for bad-words list
@@ -2929,7 +2970,8 @@ client.on('interactionCreate', async interaction => {
             baseList.push(w);
             await saveJSONFile("blocked_words.json", baseList);
         }
-        await interaction.reply({content:"Added to content blocklist."});
+        await interaction.reply({content:"Added to content blocklist.", allowedMentions: { parse: [] }});
+
         return;
     }
 });
