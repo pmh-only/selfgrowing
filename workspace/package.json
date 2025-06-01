@@ -1,7 +1,7 @@
 {
-  "name": "discordjs-largebot",
+  "name": "big-discord-bot",
   "version": "1.0.0",
-  "description": "Large-scale Discord bot for single channel, public data, with slash commands and fun features.",
+  "description": "Large-scale Discord bot with sqlite and advanced features",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -15,8 +15,8 @@
     "node-fetch": "^3.3.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18"
   },
-  "author": "anon",
+  "author": "",
   "license": "MIT"
 }
