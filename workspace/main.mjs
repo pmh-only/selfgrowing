@@ -149,6 +149,14 @@ await db.run(`CREATE TABLE IF NOT EXISTS suggestion (
     votes INTEGER NOT NULL DEFAULT 0,
     handled INTEGER NOT NULL DEFAULT 0 -- ADDED FIELD: track "handled" suggestions
 )`);
+// Additional Feature: Add suggestion auto-tag column for UX (category), migrate existing data if needed
+try {
+    const cols = await db.all("PRAGMA table_info('suggestion')");
+    if (!cols.some(c => c.name === "category")) {
+        await db.run("ALTER TABLE suggestion ADD COLUMN category TEXT");
+    }
+} catch {}
+
 
 await db.run(`CREATE TABLE IF NOT EXISTS user_tags (
     userId TEXT PRIMARY KEY,
@@ -1435,7 +1443,7 @@ return;
     if (interaction.isChatInputCommand() && interaction.commandName === "suggestions") {
         // List all open suggestions, mark those handled with [HANDLED], UX improvement
         let recs = await db.all(
-            "SELECT * FROM suggestion WHERE status='pending' OR status='approved' ORDER BY createdAt DESC LIMIT 10"
+            "SELECT * FROM suggestion WHERE status='pending' OR status='approved' OR status='handled' ORDER BY createdAt DESC LIMIT 10"
         );
         if (!recs.length) {
             await interaction.reply({content: "No suggestions yet! Use `/suggest` to add one."});
@@ -1454,7 +1462,7 @@ return;
         }
         let embeds = entries.map((s, idx) =>
             new EmbedBuilder()
-                .setTitle(`${s.handled ? "✅ [HANDLED]" : ""} Suggestion #${s.id}`)
+                .setTitle(`${s.handled ? "✅ [HANDLED]" : ""} Suggestion #${s.id}${s.category?` (${s.category})`:""}`)
                 .setDescription([
                     `> ${s.suggestion}`,
                     `By: <@${s.userId}>`,
@@ -1468,6 +1476,7 @@ return;
         await interaction.reply({embeds: embeds.slice(0,3)});
         return;
     }
+
 
     // --- SLASH: SUGGESTHANDLE ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'suggesthandle') {
@@ -1484,10 +1493,38 @@ return;
             await interaction.reply({content:"No such suggestion.", allowedMentions: { parse: [] }});
             return;
         }
+        // Minor improvement: mark handled column and update status, provide option for admin to set category as well (modal)
         await db.run("UPDATE suggestion SET status=?, handled=1 WHERE id=?", stat, sid);
-        await interaction.reply({content: `Suggestion #${sid} marked as **${stat}** (Handled).`, allowedMentions: { parse: [] }});
+
+        // After marking as handled, allow admin to tag category for organize UX via modal
+        if (stat === "approved" || stat === "handled") {
+            const modal = new ModalBuilder()
+                .setTitle('Tag Suggestion (optional)')
+                .setCustomId('suggest_category_modal')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                        .setCustomId('category')
+                        .setLabel('Add category/tag for this suggestion (optional)')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(false)
+                    )
+                );
+            client._suggestHandleTemp = {sid};
+            await interaction.showModal(modal);
+
+            client.once('interactionCreate', async modalInter => {
+                if (!modalInter.isModalSubmit() || modalInter.customId!=='suggest_category_modal') return;
+                let cat = modalInter.fields.getTextInputValue('category');
+                if (cat && cat.length>=2) await db.run("UPDATE suggestion SET category=? WHERE id=?", cat, sid);
+                await modalInter.reply({content: `Suggestion #${sid} marked as **${stat}**${cat?` in category \`${cat}\``:""}.`, allowedMentions: { parse: [] }});
+            });
+        } else {
+            await interaction.reply({content: `Suggestion #${sid} marked as **${stat}** (Handled).`, allowedMentions: { parse: [] }});
+        }
         return;
     }
+
 
 
     // --- UX improvement: Quick Roll Button (+data persistence; show leaderboard) ---
