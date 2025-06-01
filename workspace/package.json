@@ -1,7 +1,7 @@
 {
-  "name": "discord-bot",
+  "name": "discordjs-privatebot",
   "version": "1.0.0",
-  "description": "Private, single-server Discord bot with productivity, moderation, and fun features.",
+  "description": "A private Discord.js bot with productivity, moderation and fun features. Single-channel only.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -15,5 +15,15 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "discord.js",
+    "sqlite",
+    "productivity",
+    "moderation"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
 }
