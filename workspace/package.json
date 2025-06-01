@@ -1,16 +1,15 @@
 {
-  "name": "discordjs-single-main",
+  "name": "discord-largebot",
   "version": "1.0.0",
-  "description": "Large scale Discord bot with all features in main.mjs",
-  "main": "main.mjs",
   "type": "module",
+  "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6",
     "humanize-duration": "^3.30.0"
   },
   "engines": {
