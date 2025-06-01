@@ -2937,41 +2937,6 @@ client.on('interactionCreate', async interaction => {
 
 
 
-
-client.on('messageCreate', async msg => {
-    // Only allow interactions in the ONE main channel (never DM)
-    if (!msg.guild || msg.channel.id !== CHANNEL_ID) return;
-    if (msg.author.bot) return;
-
-    // Single welcome message per user per session, with Get Started button (moved to main channel)
-    if (!userWelcomeStatus[msg.author.id]) {
-        await msg.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("👋 Welcome!")
-                    .setDescription([
-                        "I'm your assistant bot — **notes**, **to-do** (try `/todo`), **reminders**, **polls**, fun games & more via slash commands!",
-                        "",
-                        "**Try:**",
-                        "- `/todo add` to keep a personal to-do list",
-                        "- `/note add` for quick notes",
-                        "- `/remind` for channel reminders",
-                        "- `/avatar` to view profile pictures",
-                        "- `/quotes` for fun/motivation",
-                        "",
-                        "**Click Get Started for a full command guide.**",
-                    ].join("\n"))
-                    .setColor(0x6ee7b7)
-            ],
-            components: [welcomeButtonRow]
-        });
-        userWelcomeStatus[msg.author.id] = true;
-        return;
-    }
-});
-
-
-
 // Get Started button handler for welcome embed (now always in main channel)
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton() || interaction.customId!=='dm_getstarted') return;
