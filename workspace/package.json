@@ -1,30 +1,19 @@
 {
-  "name": "discord-bot",
+  "name": "discord-singlefile-bot",
   "version": "1.0.0",
-  "description": "Large-scale single file Discord.js bot with admin, moderation, fun games, and user tools. Designed for single guild and channel.",
+  "description": "A private Discord bot with moderation, polls, games, and fun features. Single main.mjs file.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "discord",
-    "bot",
-    "discord.js",
-    "sqlite",
-    "slash-commands",
-    "games",
-    "moderation"
-  ],
-  "author": "YourName",
-  "license": "MIT"
+  }
 }

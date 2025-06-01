@@ -994,9 +994,10 @@ return;
             .setTitle("💬 Saved Quote")
             .setDescription(`"${q.content}"`)
             .setFooter({text: `By ${(q.user?.tag || q.author_tag || "Unknown")} at <t:${Math.floor(q.timestamp/1000)}:f>${q.category?` | #${q.category}`:""}`});
-        await interaction.reply({embeds:[embed]});
+        await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
         return;
     }
+
 
 
     // --- SLASH: QUOTEADD (NEW PUBLIC ADD QUOTE FEATURE) ---
@@ -1321,9 +1322,10 @@ return;
                 ).join('\n')
             )
             .setColor(0x6d28d9);
-        await interaction.reply({embeds:[embed]});
+        await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
         return;
     }
+
 
 
     // --- SLASH: PURGE with Confirmation and Cooldown ---
@@ -1897,9 +1899,10 @@ return;
             .setTitle("🏆 Rock Paper Scissors Leaderboard")
             .setDescription(desc)
             .setColor(0xf0883e);
-        await interaction.reply({embeds: [embed]});
+        await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
         return;
     }
+
 
 
 
@@ -1963,9 +1966,10 @@ return;
     if (interaction.isChatInputCommand() && interaction.commandName === '8ball') {
         const q = interaction.options.getString('question');
         const reply = eightBallResponses[Math.floor(Math.random()*eightBallResponses.length)];
-        await interaction.reply({content:`🎱 *Q: ${q}*\nA: **${reply}**`, ephemeral:false});
+        await interaction.reply({content:`🎱 *Q: ${q}*\nA: **${reply}**`, ephemeral:false, allowedMentions: { parse: [] }});
         return;
     }
+
     // --- SLASH: SNIPE ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'snipe') {
         const lastDeleted = await db.get('SELECT * FROM message_logs WHERE deleted=1 ORDER BY createdAt DESC LIMIT 1');
@@ -1978,9 +1982,10 @@ return;
         // Add jump link if possible
         if (lastDeleted.guildId && lastDeleted.channelId && lastDeleted.messageId)
           embed.setURL(`https://discord.com/channels/${lastDeleted.guildId}/${lastDeleted.channelId}/${lastDeleted.messageId}`);
-        await interaction.reply({embeds:[embed]});
+        await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
         return;
     }
+
 
     // --- SLASH: COINFLIP ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'coinflip') {
@@ -2134,7 +2139,8 @@ client.on('messageCreate', async msg => {
             "Need fun? `/8ball` awaits your questions.",
             "I'm always here to assist. Type `/` to see more."
         ];
-        await msg.reply({content: responses[Math.floor(Math.random()*responses.length)]});
+        await msg.reply({content: responses[Math.floor(Math.random()*responses.length)], allowedMentions: { parse: [] }});
+
         // User XP up for interacting directly with bot/tag
         const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', msg.author.id) || {xp:0,level:0};
         let xpAdd = Math.floor(Math.random()*5)+5; // boost for bot interaction
@@ -2145,6 +2151,8 @@ client.on('messageCreate', async msg => {
             msg.author.id, xpNow, lvlNow);
         if (lvlNow > row.level)
             await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`, allowedMentions: { parse: [] }});
+
+
 
     }
 
@@ -2174,7 +2182,8 @@ client.on('messageCreate', async msg => {
                 await db.run('INSERT OR REPLACE INTO xp(userId, xp, level) VALUES (?,?,?)',
                     msg.author.id, xpNow, lvlNow);
                 if (lvlNow > row.level)
-                    await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`});
+                    await msg.reply({content:`🌟 You leveled up to ${lvlNow}!`, allowedMentions: { parse: [] }});
+
             }
         }
         // Basic moderation: block bad words, allow config of blocked words in /data/blocked_words.json
@@ -2189,6 +2198,8 @@ client.on('messageCreate', async msg => {
             await msg.delete().catch(()=>{});
             await msg.reply({content:"🚫 Message removed for inappropriate language.", allowedMentions: { parse: [] }});
 
+
+
             await db.run('INSERT INTO warnings(userId, reason, timestamp) VALUES (?,?,?)',
                 msg.author.id, "Inappropriate language", Date.now());
         }
@@ -2201,7 +2212,8 @@ client.on('messageCreate', async msg => {
                     .setLabel("💾 Save this code as private note")
                     .setStyle(ButtonStyle.Success)
             );
-            await msg.reply({content: "Detected code — save to notes?", components: [row]});
+            await msg.reply({content: "Detected code — save to notes?", components: [row], allowedMentions: { parse: [] }});
+
         }
     }
 
@@ -2729,7 +2741,8 @@ client.on('interactionCreate', async interaction => {
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)', interaction.user.id, code.substring(0,500), Date.now());
             await interaction.reply({content:"✅ Code saved as note (in `/note list`, public)."});
         } catch(e) {
-            await interaction.reply({content:"Could not save code."});
+            await interaction.reply({content:"Could not save code.", allowedMentions: { parse: [] }});
+
         }
         return;
     }
@@ -2943,9 +2956,10 @@ client.on('interactionCreate', async interaction => {
             }
         }
         embed.setDescription(lines.join("\n") || `No ${isUp ? "upvoted" : "downvoted"} messages found.`);
-        await interaction.reply({embeds:[embed]});
+        await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
         return;
     }
+
 });
 
 
