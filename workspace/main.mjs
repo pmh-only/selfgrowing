@@ -1,6 +1,87 @@
 // main.mjs
 
-import { Client, GatewayIntentBits, Partials, REST, Routes, InteractionType, PermissionFlagsBits, MessageType, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, REST, Routes, InteractionType, PermissionFlagsBits, MessageType, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle }
+
+    // --- SLASH: REPORT ---
+    if (interaction.isChatInputCommand && interaction.commandName === "report") {
+        // UX Restriction: Only allow in main channel, public report log, no mentions.
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({ content: "Reports must be made in the main public channel. Use the command there!", allowedMentions: { parse: [] }});
+            return;
+        }
+        const messageId = interaction.options.getString("message_id");
+        const reason = interaction.options.getString("reason");
+        try {
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            let msg;
+            try {
+                msg = await chan.messages.fetch(messageId);
+            } catch {
+                // Still allow reporting to log even if deleted
+                msg = null;
+            }
+            // Prepare a report log entry for moderation (store in /data/reports.json), public viewing
+            let reports = [];
+            try { reports = await readJSONFile("reports.json", []); } catch {}
+            const reportObj = {
+                reporterId: interaction.user.id,
+                reporterName: interaction.user.username,
+                messageId: messageId,
+                reportedContent: msg ? msg.content : "[Deleted/unavailable]",
+                reportedAuthorId: msg ? msg.author.id : null,
+                reportedAuthorName: msg ? msg.author.username : null,
+                reason: reason,
+                reportedAt: Date.now()
+            };
+            reports.push(reportObj);
+            // Only keep latest 50 reports.
+            if (reports.length > 50) reports = reports.slice(-50);
+            await saveJSONFile("reports.json", reports);
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🚩 Message Reported")
+                        .setDescription(`Message ${msg ? `from "${msg.author.username}"` : `[unavailable]`} has been reported.`)
+                        .addFields(
+                            { name: "Reason", value: reason },
+                            { name: "Message ID", value: messageId },
+                            { name: "Reporter", value: interaction.user.username }
+                        )
+                        .setFooter({ text: "All reports are public and logged in /reports" })
+                        .setColor(0xff3b3b)
+                        .setTimestamp()
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({ content: "Failed to report the message. Make sure the ID is correct!", allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
+    // --- SLASH: REPORTS (view all public reports) ---
+    if (interaction.isChatInputCommand && interaction.commandName === "reports") {
+        // Anyone can view recent public reports
+        let reports = [];
+        try { reports = await readJSONFile("reports.json", []); } catch {}
+        if (!reports.length) {
+            await interaction.reply({ content: "No message reports yet!", allowedMentions: { parse: [] } });
+            return;
+        }
+        let embed = new EmbedBuilder()
+            .setTitle("🚩 Recent Message Reports")
+            .setDescription(reports.slice(-10).reverse().map((r, i) =>
+                `**[${i+1}]** Reporter: ${r.reporterName}\nMessage ID: ${r.messageId}` +
+                (r.reportedAuthorName ? `\nAuthor: ${r.reportedAuthorName}` : "") +
+                `\nContent: ${r.reportedContent.slice(0,80)}\nReason: ${r.reason}\nAt: <t:${Math.floor(r.reportedAt/1000)}:f>\n`
+            ).join('\n\n'))
+            .setColor(0xffbdbd)
+            .setFooter({ text: "Reports are public, for transparency." });
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
+
+ from 'discord.js';
 import sqlite3 from 'sqlite3';
 import fs from 'fs/promises';
 import { open } from 'sqlite';
@@ -871,7 +952,28 @@ client.on('interactionCreate', async interaction => {
             components: [row],
             allowedMentions: { parse: [] }
         });
+        // --- ADDITIONAL FEATURE: REPORT MESSAGES COMMAND (slash) ---
+        // Register "report" command if not yet registered.
+        try {
+            const commandsList = await rest.get(
+                Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID)
+            );
+            if (!commandsList.find(cmd => cmd.name === "report")) {
+                await rest.post(
+                    Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID),
+                    { body: [{
+                        name: "report",
+                        description: "Report a message for review.",
+                        options: [
+                            { name: "message_id", type: 3, description: "Message ID to report", required: true },
+                            { name: "reason", type: 3, description: "Reason for reporting", required: true }
+                        ]
+                    }] }
+                );
+            }
+        } catch (e) { }
         return;
+
     }
 
     if (interaction.isChatInputCommand && interaction.commandName === "joke") {
