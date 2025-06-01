@@ -85,7 +85,12 @@ const changelog_response = await client.responses.create({
   ]
 })
 
-await changelog.send(changelog_response.output_text)
+await changelog.send({
+  content: changelog_response.output_text,
+  allowedMentions: {
+    parse: []
+  }
+})
 
 const commit_response = await client.responses.create({
   model: 'gpt-4.1',
