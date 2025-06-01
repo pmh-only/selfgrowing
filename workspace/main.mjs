@@ -1476,18 +1476,19 @@ return;
         let stat = interaction.options.getString('status');
         let validStatus = ["approved", "rejected", "handled"];
         if (!sid || !stat || !validStatus.includes(stat)) {
-            await interaction.reply({content:"Invalid suggestion ID or status."});
+            await interaction.reply({content:"Invalid suggestion ID or status.", allowedMentions: { parse: [] }});
             return;
         }
         let row = await db.get("SELECT * FROM suggestion WHERE id=?", sid);
         if (!row) {
-            await interaction.reply({content:"No such suggestion."});
+            await interaction.reply({content:"No such suggestion.", allowedMentions: { parse: [] }});
             return;
         }
         await db.run("UPDATE suggestion SET status=?, handled=1 WHERE id=?", stat, sid);
-        await interaction.reply({content: `Suggestion #${sid} marked as **${stat}** (Handled).`});
+        await interaction.reply({content: `Suggestion #${sid} marked as **${stat}** (Handled).`, allowedMentions: { parse: [] }});
         return;
     }
+
 
     // --- UX improvement: Quick Roll Button (+data persistence; show leaderboard) ---
     if (interaction.isChatInputCommand() && interaction.commandName === "roll") {
