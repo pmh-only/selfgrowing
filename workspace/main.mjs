@@ -358,6 +358,14 @@ const contextCommands = [
 // [FEATURE] Add /feedback and /feedbacklist slash commands for public feedback board.
     const commands = [
         // ... previous commands ...
+        // --- ADDITIONAL FEATURE: REMINDER REMOVE COMMAND ---
+        {
+            name: 'reminderremove',
+            description: 'Remove a pending reminder by its number from your reminder list.',
+            options: [
+                { name: 'number', type: 4, description: 'Reminder number as seen in /reminders.', required: true }
+            ]
+        },
         {
             name: 'note',
             description: 'Add/view/delete personal notes publicly in channel.',
@@ -374,6 +382,7 @@ const contextCommands = [
             name: 'downvotes',
             description: 'Show the most downvoted messages in the channel!'
         },
+
         // [ADDED: COMMAND REGISTRATION MISSING] Add missing suggesthandle and rps-stats public commands
         {
             name: 'suggesthandle',
@@ -1568,6 +1577,27 @@ return;
         scheduleReminders(client);
         return;
     }
+
+    // --- ADDITIONAL FEATURE: REMINDER REMOVE COMMAND ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'reminderremove') {
+        // List this user's pending reminders and allow remove by number
+        let num = interaction.options.getInteger('number');
+        let rows = await db.all('SELECT id, content, remindAt FROM reminders WHERE userId=? ORDER BY remindAt ASC', interaction.user.id);
+        if (!rows || !rows.length || num < 1 || num > rows.length) {
+            await interaction.reply({ content: "That number is not valid. Use `/reminders` to see your numbers!", allowedMentions: { parse: [] } });
+            return;
+        }
+        let rec = rows[num-1];
+        await db.run('DELETE FROM reminders WHERE id=?', rec.id);
+        await interaction.reply({
+            content: `⏰ Removed reminder #${num}: *${rec.content}* (was scheduled <t:${Math.floor(rec.remindAt/1000)}:R>)`,
+            allowedMentions: { parse: [] }
+        });
+        // Re-schedule next
+        scheduleReminders(client);
+        return;
+    }
+
 
 
 
