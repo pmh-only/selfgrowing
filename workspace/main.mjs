@@ -7,37 +7,6 @@ import { Client, GatewayIntentBits, Partials, REST, Routes, InteractionType, Per
         // UX Restriction: Only allow in main channel, public report log, no mentions.
         if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
             await interaction.reply({ content: "Reports must be made in the main public channel. Use the command there!", allowedMentions: { parse: [] }});
-
-
-
-
-// === [ FEATURE: REPORT DELETE BUTTON HANDLER ] ===
-client.on('interactionCreate', async interaction => {
-    if (interaction.isButton() && interaction.customId.startsWith('delete_report_')) {
-        // Only allow in main channel as always per restrictions
-        let msgId = interaction.customId.slice('delete_report_'.length);
-        let reports = [];
-        try { reports = await readJSONFile("reports.json", []); } catch {}
-        // Find last matching messageId (could be multiple; delete last)
-        let idx = -1;
-        for (let i = reports.length-1; i >= 0; --i) {
-            if (reports[i].messageId === msgId) {
-                idx = i; break;
-            }
-        }
-        if (idx === -1) {
-            await interaction.reply({ content: "No such report found to delete.", allowedMentions: { parse: [] } });
-            return;
-        }
-        reports.splice(idx,1);
-        await saveJSONFile("reports.json", reports);
-        await interaction.reply({ content: "Latest report has been deleted.", allowedMentions: { parse: [] } });
-        return;
-    }
-});
-
-
-
             return;
         }
         const messageId = interaction.options.getString("message_id");
@@ -90,6 +59,31 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+// === [ FEATURE: REPORT DELETE BUTTON HANDLER ] ===
+client.on('interactionCreate', async interaction => {
+    if (interaction.isButton() && interaction.customId.startsWith('delete_report_')) {
+        // Only allow in main channel as always per restrictions
+        let msgId = interaction.customId.slice('delete_report_'.length);
+        let reports = [];
+        try { reports = await readJSONFile("reports.json", []); } catch {}
+        // Find last matching messageId (could be multiple; delete last)
+        let idx = -1;
+        for (let i = reports.length-1; i >= 0; --i) {
+            if (reports[i].messageId === msgId) {
+                idx = i; break;
+            }
+        }
+        if (idx === -1) {
+            await interaction.reply({ content: "No such report found to delete.", allowedMentions: { parse: [] } });
+            return;
+        }
+        reports.splice(idx,1);
+        await saveJSONFile("reports.json", reports);
+        await interaction.reply({ content: "Latest report has been deleted.", allowedMentions: { parse: [] } });
+        return;
+    }
+});
+
     // --- SLASH: REPORTS (view all public reports) ---
     if (interaction.isChatInputCommand && interaction.commandName === "reports") {
         // Anyone can view recent public reports
@@ -119,6 +113,8 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed], components: actionRow ? [actionRow] : [], allowedMentions: { parse: [] } });
         return;
     }
+
+
 
 
 
