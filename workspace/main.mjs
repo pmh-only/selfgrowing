@@ -413,6 +413,15 @@ const contextCommands = [
             name: 'feedbacklist',
             description: 'Show recent public feedback board for the community'
         },
+        // --- NEW MODERATION TOOL: MASS WARN CLEAR ---
+        {
+            name: 'clearwarnings',
+            description: 'Remove all warnings for a user',
+            options: [
+                { name: 'user', type: 6, description: "User to clear warnings for", required: true }
+            ]
+        },
+
 
 
 
@@ -1491,10 +1500,24 @@ return;
                 .setTitle(`${tgt.tag}'s last 10 warnings`)
                 .setDescription(rows.map(r=>`• ${r.reason} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
                 .setColor(0xd13a29);
-            await interaction.reply({embeds:[embed]});
+            await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
         }
         return;
     }
+
+    // --- SLASH: CLEARWARNINGS ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "clearwarnings") {
+        // Mass clear all warnings for a user
+        const user = interaction.options.getUser('user');
+        try {
+            await db.run('DELETE FROM warnings WHERE userId=?', user.id);
+            await interaction.reply({content: `All warnings for user ${user.tag} have been cleared.`, allowedMentions: { parse: [] }});
+        } catch (e) {
+            await interaction.reply({content:"Failed to clear warnings for this user.", allowedMentions: { parse: [] }});
+        }
+        return;
+    }
+
     // --- SLASH: CLEARREACTIONS (admin-only UX improvement) ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'clearreactions') {
         // Permissions not required - all users are 'admin' for demonstration
