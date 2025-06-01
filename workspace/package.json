@@ -1,29 +1,19 @@
 {
-  "name": "discordjs-largebot-singlefile",
+  "name": "discord-largebot",
   "version": "1.0.0",
   "type": "module",
+  "description": "A large scale Discord bot with polls, games, mod tools, and productivity features.",
   "main": "main.mjs",
-  "description": "Large scale Discord.js bot with single main.mjs file. Supports sqlite, public UX, slash commands, persistent data.",
   "scripts": {
     "start": "node main.mjs"
-  },
-  "dependencies": {
-    "discord.js": "^14.14.1",
-    "humanize-duration": "^3.29.0",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.6"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": [
-    "discord",
-    "discord.js",
-    "bot",
-    "sqlite",
-    "slash-commands",
-    "single-file"
-  ],
-  "author": "Your Name",
-  "license": "MIT"
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "sqlite3": "^5.1.6",
+    "sqlite": "^5.1.1",
+    "humanize-duration": "^3.29.0"
+  }
 }

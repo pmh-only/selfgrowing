@@ -984,10 +984,12 @@ return;
                     .setTitle(`${tgt.tag}'s Avatar`)
                     .setImage(tgt.displayAvatarURL({ extension: 'png', size: 4096}))
                     .setColor(0x30cdfa)
-            ]
+            ],
+            allowedMentions: { parse: [] }
         });
         return;
     }
+
 
 
     // --- SLASH: QUOTE (admin, with category modal) ---
@@ -1245,10 +1247,11 @@ return;
         const user = interaction.options.getUser('user');
         const txt = interaction.options.getString('message');
         try {
-            await user.send(`[Message from admin]\n${txt}`);
-            await interaction.reply({content:`Sent DM to ${user.tag}`, allowedMentions: { parse: [] }});
+            // Move out DM features to guild channel per restrictions:
+            await interaction.channel.send({content:`Admin message to ${user.username}:\n${txt}`, allowedMentions: { parse: [] }});
+            await interaction.reply({content:`Sent message to ${user.tag} (as public message due to DM restriction)`, allowedMentions: { parse: [] }});
         } catch {
-            await interaction.reply({content:"I couldn't DM this user (maybe DM closed).", allowedMentions: { parse: [] }});
+            await interaction.reply({content:"Failed to send message publicly!", allowedMentions: { parse: [] }});
         }
 
         return;
@@ -1260,11 +1263,12 @@ return;
 
 
 
+
     // --- SLASH: TIMER ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'timer') {
         // Only allow in the single main channel (no DM)
         if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
-            await interaction.reply({content:"Use /timer in the main channel only!", ephemeral:true}); return;
+            await interaction.reply({content:"Use /timer in the main channel only!", ephemeral:true, allowedMentions: { parse: [] }}); return;
         }
         const name = interaction.options.getString('name').substring(0,40);
         const dur = parseTime(interaction.options.getString('duration'));
@@ -1280,7 +1284,7 @@ return;
           try {
             const chan = client.channels.cache.get(CHANNEL_ID);
             if (chan && chan.isTextBased && chan.send) {
-                await chan.send(`<@${interaction.user.id}>, ⏰ [TIMER "${last.name}" DONE] Your ${humanizeMs(last.duration)} timer finished!`);
+                await chan.send({content: `${client.users.cache.get(interaction.user.id)?.username || interaction.user.id}, ⏰ [TIMER "${last.name}" DONE] Your ${humanizeMs(last.duration)} timer finished!`, allowedMentions: { parse: [] }});
             }
           } catch{}
         }, dur);
@@ -1288,6 +1292,7 @@ return;
 
         return;
     }
+
     if (interaction.isChatInputCommand() && interaction.commandName === "timers") {
         if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
             await interaction.reply({content:"Use in main channel only",ephemeral:true}); return;
@@ -1477,13 +1482,14 @@ return;
                 if (levels.length) {
                     embed.addFields({name:"Level up history",value: levels.slice(-3).reverse().map(l=>`Level **${l.level}** at <t:${Math.floor(l.at/1000)}:f>`).join("\n") });
                 }
-                await interaction.reply({embeds: [embed]});
+                await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
             }
         } catch(e) {
-            await interaction.reply({content:'Sorry, there was an error fetching your XP/Level.'});
+            await interaction.reply({content:'Sorry, there was an error fetching your XP/Level.', allowedMentions: { parse: [] }});
         }
         return;
     }
+
 
 
 
