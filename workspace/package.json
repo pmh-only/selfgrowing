@@ -1,7 +1,7 @@
 {
-  "name": "discordjs-privatebot",
+  "name": "discord-bot",
   "version": "1.0.0",
-  "description": "A private Discord.js bot with productivity, moderation and fun features. Single-channel only.",
+  "description": "Large-scale single file Discord.js bot with admin, moderation, fun games, and user tools. Designed for single guild and channel.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
   },
@@ -21,9 +21,10 @@
     "bot",
     "discord.js",
     "sqlite",
-    "productivity",
+    "slash-commands",
+    "games",
     "moderation"
   ],
-  "author": "Your Name",
+  "author": "YourName",
   "license": "MIT"
 }

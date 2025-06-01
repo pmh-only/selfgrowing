@@ -2828,7 +2828,7 @@ client.on('interactionCreate', async interaction => {
         // Count reactions
         let ups = await db.all(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='👍'`, msg.id);
         let downs = await db.all(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='👎'`, msg.id);
-        // New UX: show top reactors for this message with mentions, and add a "Leaderboard" button
+        // New UX: show top reactors for this message with usernames, and add a "Leaderboard" button (mentions disabled!)
         let upReactors = await db.all(
             `SELECT userId FROM reactions WHERE messageId=? AND reaction='👍' ORDER BY ts DESC LIMIT 3`,
             msg.id
@@ -2837,8 +2837,33 @@ client.on('interactionCreate', async interaction => {
             `SELECT userId FROM reactions WHERE messageId=? AND reaction='👎' ORDER BY ts DESC LIMIT 3`,
             msg.id
         );
-        let upStr = upReactors.length ? upReactors.map(u=>`<@${u.userId}>`).join(', ') : "None";
-        let downStr = downReactors.length ? downReactors.map(u=>`<@${u.userId}>`).join(', ') : "None";
+        // Fetch user names to show instead of mentions
+        let upStr = "None";
+        if (upReactors.length) {
+            let names = [];
+            for (const u of upReactors) {
+                try {
+                    let user = await client.users.fetch(u.userId);
+                    names.push(user.username || String(u.userId));
+                } catch {
+                    names.push(String(u.userId));
+                }
+            }
+            upStr = names.join(', ');
+        }
+        let downStr = "None";
+        if (downReactors.length) {
+            let names = [];
+            for (const u of downReactors) {
+                try {
+                    let user = await client.users.fetch(u.userId);
+                    names.push(user.username || String(u.userId));
+                } catch {
+                    names.push(String(u.userId));
+                }
+            }
+            downStr = names.join(', ');
+        }
         // Show button to leaderboard for UX!
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('roll_leaderboard').setLabel("Dice Leaderboard").setStyle(ButtonStyle.Primary),
@@ -2847,12 +2872,14 @@ client.on('interactionCreate', async interaction => {
         );
         await interaction.reply({
             content: `You reacted to this message with ${reaction}.\nTotal: 👍 ${ups[0].n} (recent: ${upStr}) | 👎 ${downs[0].n} (recent: ${downStr})`,
-            components: [row]
+            components: [row],
+            allowedMentions: { parse: [] }
         });
         // Add actual unicode reaction for quick visual feedback
         try { await msg.react(reaction); } catch {}
         return;
     }
+
 
 
     // Suggestion voting feature
