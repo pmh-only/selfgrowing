@@ -5,6 +5,9 @@ understand the code and choose one task below and do it without asking or stoppi
 * add additional feature
 * fix potential errors
 * ux improvement
+* fix not working feature
+* add command registration for not registered commands
+* disable mentioning in command with `allowedMentions: { parse: [] }`
 
 features can be anything such as but not limited:
 * administration tools

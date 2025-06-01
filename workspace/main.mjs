@@ -696,7 +696,7 @@ client.on('interactionCreate', async interaction => {
             }
         }
         embed.setDescription(lines.join("\n") || `No upvoted messages found.`);
-        await interaction.reply({embeds:[embed]});
+        await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
         return;
     }
     // --- SLASH: DOWNVOTES ---
