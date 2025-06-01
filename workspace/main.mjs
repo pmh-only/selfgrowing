@@ -542,6 +542,14 @@ const contextCommands = [
             ]}
         ]
     },
+    {
+        name: "dicewar",
+        description: "Start a quick Dice War game: two players each roll a die, higher wins. Use `/dicewar @user`",
+        options: [
+            { name: "opponent", type: 6, description: "User to challenge", required: true }
+        ]
+    },
+
 
     {
         name: "rollhist",
@@ -1576,6 +1584,55 @@ return;
 
 
 
+    // --- SLASH: DICE WAR (fun quick duel game) ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "dicewar") {
+        const opponent = interaction.options.getUser("opponent");
+        if (!opponent || opponent.bot || opponent.id === interaction.user.id) {
+            await interaction.reply({content: "Please challenge a real user (not yourself/bot)!"});
+            return;
+        }
+        if (client._ongoingDiceWar && client._ongoingDiceWar[interaction.user.id]) {
+            await interaction.reply({ content: `You already have a pending Dice War challenge! Wait for it to finish.` });
+            return;
+        }
+        if (client._ongoingDiceWar && client._ongoingDiceWar[opponent.id]) {
+            await interaction.reply({ content: `That user is already in a Dice War! Try again later.` });
+            return;
+        }
+        // Store challenge context (5min expiry)
+        client._ongoingDiceWar = client._ongoingDiceWar || {};
+        client._ongoingDiceWar[opponent.id] = {
+            challenger: interaction.user.id,
+            challenged: opponent.id,
+            startTime: Date.now(),
+            messageId: null,
+            accepted: false
+        };
+        const challengeRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`dicewar_accept_${interaction.user.id}`).setLabel("Accept Duel!").setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`dicewar_decline_${interaction.user.id}`).setLabel("Decline").setStyle(ButtonStyle.Danger)
+        );
+        const challengeMsg = await interaction.reply({
+            content: `<@${opponent.id}>, you have been challenged to a **Dice War** by <@${interaction.user.id}>!`,
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("🎲 Dice War Challenge!")
+                    .setDescription("<@"+opponent.id+">, do you accept this head-to-head dice duel?\nEach of you rolls 1d20. Highest wins! Draw is a rematch.")
+                    .setColor(0x84cc16)
+            ],
+            components: [challengeRow]
+        });
+        // Save the message id to match on button click
+        client._ongoingDiceWar[opponent.id].messageId = challengeMsg.id;
+        setTimeout(()=>{
+            // Timeout - auto cancel challenge after 5 mins
+            if (client._ongoingDiceWar && client._ongoingDiceWar[opponent.id] && !client._ongoingDiceWar[opponent.id].accepted) {
+                client._ongoingDiceWar[opponent.id] = undefined;
+            }
+        }, 5*60*1000);
+        return;
+    }
+
     // --- SLASH: COINFLIP ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'coinflip') {
         const result = Math.random() < 0.5 ? "Heads" : "Tails";
@@ -1590,44 +1647,8 @@ return;
         return;
     }
 
-    // --- SLASH: UPVOTES & DOWNVOTES (new public leaderboard for "Thumbs Down") ---
-    if (interaction.isChatInputCommand() && (interaction.commandName === 'upvotes' || interaction.commandName === 'downvotes')) {
-        // Unified leaderboard for thumbs up or thumbs down, more fun!
-        const isUpvotes = interaction.commandName === 'upvotes';
-        const reactionStr = isUpvotes ? "👍" : "👎";
-        let votes = [];
-        try {
-            votes = await db.all(`
-                SELECT messageId, COUNT(*) as votes
-                FROM reactions
-                WHERE reaction=?
-                GROUP BY messageId
-                ORDER BY votes DESC
-                LIMIT 5
-            `, [reactionStr]);
-        } catch {}
-        if (!votes || !votes.length) {
-            await interaction.reply({content: `No ${isUpvotes ? "upvoted" : "downvoted"} messages yet! Right click a message and use **${reactionStr === "👍" ? "Thumbs Up" : "Thumbs Down"}** to ${isUpvotes ? "upvote" : "downvote"}.`});
-            return;
-        }
-        let embed = new EmbedBuilder()
-            .setTitle(isUpvotes ? "🌟 Top Upvoted Messages" : "💢 Most Downvoted Messages")
-            .setDescription(isUpvotes ? "The most 'Thumbs Up' messages in this channel." : "Ouch! The most 'Thumbs Down' messages in this channel.");
-        let lines = [];
-        for (let row of votes) {
-            try {
-                let chan = await client.channels.fetch(CHANNEL_ID);
-                let msg = await chan.messages.fetch(row.messageId);
-                let jumplink = msg.url ? `[jump](${msg.url})` : "";
-                lines.push(`> "${msg.content.slice(0,60)}" — **${row.votes} ${reactionStr}** ${jumplink}`);
-            } catch {
-                lines.push(`(Message deleted) — **${row.votes} ${reactionStr}**`);
-            }
-        }
-        embed.setDescription(lines.join("\n") || `No ${isUpvotes ? "upvoted" : "downvoted"} messages found.`);
-        await interaction.reply({embeds:[embed]});
-        return;
-    }
+
+    
 
 
     // --- SLASH: ROCK PAPER SCISSORS ---
@@ -1726,6 +1747,34 @@ return;
 
 
 
+    // --- SLASH: DICE WAR LEADERBOARD ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "dicewarleaderboard") {
+        let score = await readJSONFile("dicewar_leader.json", []);
+        if (!score.length)
+            return void interaction.reply({content:"No Dice War games played yet."});
+        let lines = [];
+        // Try to resolve usernames
+        for (let i=0;i<score.length;i++) {
+            let s = score[i];
+            let tag = s.userId;
+            try {
+                let user = await client.users.fetch(s.userId);
+                tag = user.tag;
+            } catch {}
+            lines.push(`**#${i+1} <@${s.userId}> (${tag})** — ${s.wins} wins`);
+        }
+        lines = lines.sort((a,b)=>b.wins-a.wins).slice(0,5);
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("🎲 Dice War Leaderboard")
+                    .setDescription(lines.join('\n'))
+                    .setColor(0x2dd4bf)
+            ]
+        });
+        return;
+    }
+
     // --- SLASH: LEADERBOARD ---
 
     if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
@@ -1743,6 +1792,7 @@ return;
         await interaction.reply({content:msg,ephemeral:false, allowedMentions: { users: [] }});
         return;
     }
+
 
     // --- SLASH: 8BALL ---
     if (interaction.isChatInputCommand() && interaction.commandName === '8ball') {
@@ -1976,12 +2026,96 @@ client.on('interactionCreate', async interaction => {
     
 
 // --- POLL & DICE-GAME BUTTON HANDLERS ---
+    // --- DICE WAR BUTTONS ---
+    if (
+        interaction.isButton() &&
+        (
+            /^dicewar_accept_/.test(interaction.customId) ||
+            /^dicewar_decline_/.test(interaction.customId)
+        )
+    ) {
+        // Only the challenged user can click
+        // Accept or decline dice duel
+        let challengerId = interaction.customId.split("_")[2];
+        let challengedId = interaction.user.id;
+        if (!client._ongoingDiceWar || !client._ongoingDiceWar[challengedId]) {
+            await interaction.reply({content:"No pending Dice War challenge for you!"});
+            return;
+        }
+        if (interaction.customId.startsWith("dicewar_accept_")) {
+            // Accept - roll dice for both and resolve
+            client._ongoingDiceWar[challengedId].accepted = true;
+            let rollA = Math.floor(Math.random()*20)+1;
+            let rollB = Math.floor(Math.random()*20)+1;
+            let userA = challengerId, userB = challengedId;
+            let winner, loser, draw = false;
+            if (rollA === rollB) {
+                draw = true;
+            } else if (rollA > rollB) {
+                winner = userA;
+                loser = userB;
+            } else {
+                winner = userB;
+                loser = userA;
+            }
+            let resDesc = `<@${userA}> rolled **${rollA}**\n<@${userB}> rolled **${rollB}**\n`;
+            if (draw) {
+                resDesc += "\n🤝 It's a draw! Rematch by using `/dicewar` again.";
+            } else {
+                resDesc += `\n🏆 <@${winner}> wins the Dice War! Better luck next time, <@${loser}>.`;
+            }
+            try {
+                // Update original challenge message
+                if (client._ongoingDiceWar[challengedId].messageId) {
+                    let chan = await client.channels.fetch(CHANNEL_ID);
+                    let msg = await chan.messages.fetch(client._ongoingDiceWar[challengedId].messageId);
+                    await msg.edit({
+                        embeds: [new EmbedBuilder().setTitle("🎲 Dice War Result!").setDescription(resDesc).setColor(0xfbbf24)],
+                        components: []
+                    });
+                }
+            } catch {}
+            await interaction.reply({
+                embeds: [new EmbedBuilder().setTitle("🎲 Dice War Result!").setDescription(resDesc).setColor(0xfbbf24)],
+                components: []
+            });
+            // Optionally: store in file leaderboard /data/dicewar_leader.json
+            try {
+                let score = await readJSONFile("dicewar_leader.json", []);
+                if (!draw) {
+                    let idx = score.findIndex(x=>x.userId===winner);
+                    if (idx<0) score.push({userId:winner, wins:1});
+                    else score[idx].wins +=1;
+                    await saveJSONFile("dicewar_leader.json", score);
+                }
+            } catch {}
+            client._ongoingDiceWar[challengedId] = undefined;
+        } else {
+            // Decline
+            try {
+                if (client._ongoingDiceWar[challengedId].messageId) {
+                    let chan = await client.channels.fetch(CHANNEL_ID);
+                    let msg = await chan.messages.fetch(client._ongoingDiceWar[challengedId].messageId);
+                    await msg.edit({
+                        embeds: [
+                            new EmbedBuilder().setTitle("🎲 Dice War Challenge").setDescription(`<@${challengedId}> declined the challenge from <@${challengerId}>!`).setColor(0xfca5a5)
+                        ],
+                        components: []
+                    });
+                }
+            } catch {}
+            await interaction.reply({content:`You declined the Dice War challenge from <@${challengerId}>.`});
+            client._ongoingDiceWar[challengedId] = undefined;
+        }
+        return;
+    }
     // --- DICE ROLL BUTTONS (roll again, quick roll, leaderboard) ---
     if (interaction.isButton() && (
         /^replay_roll_/.test(interaction.customId) ||
         /^quickroll_(d6|d20)/.test(interaction.customId) ||
         /^roll_leaderboard$/.test(interaction.customId)
     )) {
+
 
         if (/^roll_leaderboard$/.test(interaction.customId)) {
             // Re-use /rollstats logic, but as embed here!
@@ -2622,7 +2756,21 @@ try {
 } catch {}
 
 
-// --- Startup reminder boot ---
+/**
+ * Register additional Dice War leaderboard slash command.
+ */
+try {
+    const restDiceWar = new REST({version: '10'}).setToken(TOKEN);
+    restDiceWar.put(
+        Routes.applicationGuildCommands(client.application.id, GUILD_ID),
+        {body:[{
+            name: "dicewarleaderboard",
+            description: "Dice War game leaderboard"
+        }]}
+    );
+} catch(e){}
+
+ // --- Startup reminder boot ---
 // Show top 5 most upvoted messages feature
 client.once('ready', () => {
 
@@ -2635,6 +2783,8 @@ client.once('ready', () => {
         name: "slash commands! (/help)"
     });
 });
+
+
 
 
 

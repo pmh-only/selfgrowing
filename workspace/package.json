@@ -1,18 +1,21 @@
 {
-  "name": "discord-singlefile-bot",
+  "name": "channelbot",
   "version": "1.0.0",
+  "description": "Large-scale single channel Discord bot (private, sqlite, slash commands)",
   "type": "module",
   "main": "main.mjs",
-  "description": "A featureful, single-file Discord bot using discord.js, sqlite, and other utilities.",
-  "author": "ChatGPT",
-  "license": "MIT",
+  "scripts": {
+    "start": "node main.mjs"
+  },
   "dependencies": {
     "discord.js": "^14.13.0",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.29.0"
+    "sqlite": "5.1.1",
+    "humanize-duration": "^3.30.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "author": "",
+  "license": "ISC"
 }
