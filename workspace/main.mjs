@@ -804,7 +804,8 @@ client.on('interactionCreate', async interaction => {
                 ]
             });
         } catch(e) {
-            await interaction.reply({ content: "Failed to pin a random quote.", allowedMentions: { users: [] } });
+            await interaction.reply({ content: "Failed to pin a random quote.", allowedMentions: { parse: [] } });
+
         }
         return;
     }
@@ -820,15 +821,17 @@ client.on('interactionCreate', async interaction => {
     }
     // Patch: defend against bug where interaction.channel is undefined/null in app commands (should not crash anywhere!)
     if (interaction.guild && !interaction.channel) {
-        try { await interaction.reply({content: 'Internal error: Could not fetch channel context.'}); } catch{}
+        try { await interaction.reply({content: 'Internal error: Could not fetch channel context.', allowedMentions: { parse: [] }}); } catch{}
         return;
     }
 
+
     // Defend: prevent errors if interaction.options is not present (Discord lib bug or corruption!)
     if (typeof interaction.isChatInputCommand === "function" && interaction.isChatInputCommand() && !interaction.options) {
-        try { await interaction.reply({content:'Internal error: Missing options.'}); } catch {}
+        try { await interaction.reply({content:'Internal error: Missing options.', allowedMentions: { parse: [] }}); } catch {}
         return;
     }
+
 
 
 
@@ -980,7 +983,8 @@ return;
     // --- SLASH: QUOTES (random, filter by tag) ---
     if (interaction.isChatInputCommand() && interaction.commandName === "quotes") {
         const quotes = await readJSONFile("quotes.json", []);
-        if (!quotes.length) return void interaction.reply({content:"No quotes saved."});
+        if (!quotes.length) return void interaction.reply({content:"No quotes saved.", allowedMentions: { parse: [] }});
+
         // If user types something like "/quotes category=tag" use it
         let txt = interaction.options? interaction.options.getString?.('category') : undefined;
         let show = quotes;
@@ -989,7 +993,8 @@ return;
         else txt = interaction.options.getString?.('category');
         if (txt) show = quotes.filter(q=>q.category && q.category.toLowerCase().includes(txt.toLowerCase()));
         const q = show[Math.floor(Math.random()*show.length)];
-        if (!q) return void interaction.reply({content:"No quotes matching that tag!"});
+        if (!q) return void interaction.reply({content:"No quotes matching that tag!", allowedMentions: { parse: [] }});
+
         const embed = new EmbedBuilder()
             .setTitle("💬 Saved Quote")
             .setDescription(`"${q.content}"`)
@@ -1026,10 +1031,11 @@ return;
                         `Added by: <@${interaction.user.id}>`
                     ].filter(Boolean).join("\n"))
                     .setColor(0x91FEDC)
-            ]
+            ], allowedMentions: { parse: [] }
         });
         return;
     }
+
 
 
 
@@ -1048,7 +1054,8 @@ return;
 
         } else if (interaction.options.getSubcommand() === 'list') {
             const rows = await db.all('SELECT id, note, timestamp, userId FROM notes ORDER BY id DESC LIMIT 10');
-            if (rows.length === 0) await interaction.reply({content:"No notes yet."});
+            if (rows.length === 0) await interaction.reply({content:"No notes yet.", allowedMentions: { parse: [] }});
+
             else {
                 const embed = new EmbedBuilder()
                   .setTitle("Last 10 Public Notes")
@@ -1060,7 +1067,8 @@ return;
         } else if (interaction.options.getSubcommand() === 'delete') {
             const idx = interaction.options.getInteger('number');
             const allRows = await db.all('SELECT id, userId FROM notes ORDER BY id DESC LIMIT 10');
-            if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!"});
+            if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!", allowedMentions: { parse: [] }});
+
             // Allow any user to delete any note for public UX (demonstration mode)
             await db.run('DELETE FROM notes WHERE id=?', allRows[idx-1].id);
             await interaction.reply({content:"🗑️ Note deleted.", allowedMentions: { parse: [] }});
@@ -1082,7 +1090,8 @@ return;
             const query = interaction.options.getString("query").toLowerCase();
             const rows = await db.all('SELECT note, timestamp, userId FROM notes ORDER BY id DESC LIMIT 50');
             const matches = rows.filter(r => r.note.toLowerCase().includes(query));
-            if (!matches.length) return void interaction.reply({content:`No matching notes found for "${query}".`});
+            if (!matches.length) return void interaction.reply({content:`No matching notes found for "${query}".`, allowedMentions: { parse: [] }});
+
             const embed = new EmbedBuilder()
                 .setTitle(`🔎 Notes matching "${query}"`)
                 .setDescription(matches.slice(0,10).map((n,i)=>`**[${i+1}]** <@${n.userId}>: ${n.note} _(at <t:${Math.floor(n.timestamp/1000)}:f>)_`).join("\n"))
@@ -1101,8 +1110,9 @@ return;
     if (interaction.isChatInputCommand() && interaction.commandName === 'todo') {
         // Only allow in main channel, everywhere public (privacy restriction removed)
         if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
-            await interaction.reply({content:"To-dos are now public, use in the main channel!", ephemeral:false}); return;
+            await interaction.reply({content:"To-dos are now public, use in the main channel!", ephemeral:false, allowedMentions: { parse: [] }}); return;
         }
+
         const sub = interaction.options.getSubcommand();
         if (sub === "add") {
             let txt = interaction.options.getString("content").substring(0,300);
@@ -1119,20 +1129,23 @@ return;
         } else if (sub === "complete") {
             let idx = interaction.options.getInteger('number');
             let rows = await db.all("SELECT id, content FROM todo_entries ORDER BY ts DESC LIMIT 15");
-            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
+            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #", allowedMentions: { parse: [] }});
+
             await db.run("UPDATE todo_entries SET done=1 WHERE id=?", rows[idx-1].id);
             await interaction.reply({content:`✅ Marked "${rows[idx-1].content}" as done.`, allowedMentions: { parse: [] }});
 
         } else if (sub === "remove") {
             let idx = interaction.options.getInteger('number');
             let rows = await db.all("SELECT id FROM todo_entries ORDER BY ts DESC LIMIT 15");
-            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
+            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #", allowedMentions: { parse: [] }});
+
             await db.run("DELETE FROM todo_entries WHERE id=?", rows[idx-1].id);
             await interaction.reply({content:"🗑️ To-do removed.", allowedMentions: { parse: [] }});
 
         } else if (sub === "list") {
             let todos = await db.all("SELECT content, done, ts, userId FROM todo_entries ORDER BY ts DESC");
-            if (!todos.length) return void interaction.reply({content:"To-do list is empty!"});
+            if (!todos.length) return void interaction.reply({content:"To-do list is empty!", allowedMentions: { parse: [] }});
+
             let embed = new EmbedBuilder()
                 .setTitle("📝 Public To-Do List")
                 .setDescription(todos.map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** <@${t.userId}>: ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
@@ -1147,7 +1160,8 @@ return;
             let idx = interaction.options.getInteger('number');
             let newContent = interaction.options.getString('content').substring(0, 300);
             let rows = await db.all("SELECT id, content, userId FROM todo_entries ORDER BY ts DESC LIMIT 15");
-            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
+            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #", allowedMentions: { parse: [] }});
+
             let todoId = rows[idx-1].id;
             let oldContent = rows[idx-1].content;
             await db.run("UPDATE todo_entries SET content=?, ts=? WHERE id=?", newContent, Date.now(), todoId);
@@ -1194,8 +1208,10 @@ return;
         }
         const name = interaction.options.getString('name').substring(0,40);
         const dur = parseTime(interaction.options.getString('duration'));
-        if (!dur || isNaN(dur) || dur < 5000) return void interaction.reply({content:"Invalid duration. Min: 5 seconds.", ephemeral:true});
-        if (dur > 5*60*60*1000) return void interaction.reply({content:"Timer max is 5 hours.", ephemeral:true});
+        if (!dur || isNaN(dur) || dur < 5000) return void interaction.reply({content:"Invalid duration. Min: 5 seconds.", ephemeral:true, allowedMentions: { parse: [] }});
+
+        if (dur > 5*60*60*1000) return void interaction.reply({content:"Timer max is 5 hours.", ephemeral:true, allowedMentions: { parse: [] }});
+
         await db.run('INSERT INTO timers(userId, name, setAt, duration, running) VALUES (?,?,?,?,1)', interaction.user.id, name, Date.now(), dur);
         setTimeout(async()=>{
           const last = await db.get('SELECT * FROM timers WHERE userId=? AND name=? AND running=1', interaction.user.id, name);
@@ -1217,7 +1233,8 @@ return;
             await interaction.reply({content:"Use in main channel only",ephemeral:true}); return;
         }
         const rows = await db.all('SELECT name, setAt, duration, running FROM timers WHERE userId=? ORDER BY setAt DESC LIMIT 10', interaction.user.id);
-        if (!rows.length) return void interaction.reply({content:"No running or completed timers found."});
+        if (!rows.length) return void interaction.reply({content:"No running or completed timers found.", allowedMentions: { parse: [] }});
+
         let desc = rows.map(r => {
             if (r.running) {
                 let left = humanizeMs(r.setAt + r.duration - Date.now());
@@ -1235,8 +1252,9 @@ return;
         // Move all reminders to public channel for compliance
         const content = interaction.options.getString('content').substring(0,200);
         const delay = parseTime(interaction.options.getString('time'));
-        if (!delay) return void interaction.reply({content:"Invalid time. Use e.g. 10m, 2h, 1d (or combine, e.g. 1h30m)", ephemeral:true});
-        if (delay > 7*24*60*60*1000) return void interaction.reply({content:"Max is 7d.",ephemeral:true});
+        if (!delay) return void interaction.reply({content:"Invalid time. Use e.g. 10m, 2h, 1d (or combine, e.g. 1h30m)", ephemeral:true, allowedMentions: { parse: [] }});
+        if (delay > 7*24*60*60*1000) return void interaction.reply({content:"Max is 7d.",ephemeral:true, allowedMentions: { parse: [] }});
+
         await db.run('INSERT INTO reminders(userId, content, remindAt) VALUES (?,?,?)',
             interaction.user.id, content, Date.now() + delay);
         await interaction.reply({content:`⏰ Reminder set! I'll remind **in the main channel** in ${humanizeMs(delay)}.`, allowedMentions: { parse: [] }});
@@ -1284,9 +1302,10 @@ return;
         // Permissions not required - all users are 'admin' for demonstration
         let msgId = interaction.options.getString('message_id');
         if (!msgId) {
-            await interaction.reply({content:"Please provide a message ID."});
+            await interaction.reply({content:"Please provide a message ID.", allowedMentions: { parse: [] }});
             return;
         }
+
         try {
             // Remove all upvotes/downvotes tied to this message
             await db.run('DELETE FROM reactions WHERE messageId=? AND (reaction="👍" OR reaction="👎")', msgId);
@@ -1335,13 +1354,14 @@ return;
         if (!client._purgeCooldown) client._purgeCooldown = {};
         const lastT = client._purgeCooldown[interaction.user.id]||0;
         if (Date.now()-lastT < 60000)
-            return void interaction.reply({content:`Please wait before purging again for safety. (${Math.ceil((60000-(Date.now()-lastT))/1000)}s left)`});
+            return void interaction.reply({content:`Please wait before purging again for safety. (${Math.ceil((60000-(Date.now()-lastT))/1000)}s left)`, allowedMentions: { parse: [] }});
+
         let n = interaction.options.getInteger('count');
         if (n<1 || n>50) {
             await interaction.reply({content:'Count must be 1-50.', allowedMentions: { parse: [] }});
-
             return;
         }
+
         // Confirm visual with button
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -1413,8 +1433,9 @@ return;
         // Suggestion feature: add suggestion to db and post it for voting
         const text = interaction.options.getString("text")?.trim();
         if (!text || text.length < 4) {
-            await interaction.reply({content: "Suggestion too short! Please provide more details."}); return;
+            await interaction.reply({content: "Suggestion too short! Please provide more details.", allowedMentions: { parse: [] }}); return;
         }
+
         // Insert suggestion into DB
         await db.run(
             "INSERT INTO suggestion(userId, suggestion, createdAt) VALUES (?,?,?)",
@@ -1448,9 +1469,10 @@ return;
             "SELECT * FROM suggestion WHERE status='pending' OR status='approved' OR status='handled' ORDER BY createdAt DESC LIMIT 10"
         );
         if (!recs.length) {
-            await interaction.reply({content: "No suggestions yet! Use `/suggest` to add one."});
+            await interaction.reply({content: "No suggestions yet! Use `/suggest` to add one.", allowedMentions: { parse: [] }});
             return;
         }
+
         let entries = [];
         for (let s of recs) {
             // Count votes as reactions (reuse reactions table by suggest_id)
@@ -1491,10 +1513,12 @@ return;
             return;
         }
         let row = await db.get("SELECT * FROM suggestion WHERE id=?", sid);
+
         if (!row) {
             await interaction.reply({content:"No such suggestion.", allowedMentions: { parse: [] }});
             return;
         }
+
         // Minor improvement: mark handled column and update status, provide option for admin to set category as well (modal)
         await db.run("UPDATE suggestion SET status=?, handled=1 WHERE id=?", stat, sid);
 
@@ -1598,7 +1622,8 @@ return;
                     new ButtonBuilder().setCustomId('quickroll_d6').setLabel("Roll 1d6").setStyle(ButtonStyle.Primary),
                     new ButtonBuilder().setCustomId('quickroll_d20').setLabel("Roll 1d20").setStyle(ButtonStyle.Success)
                 );
-                await interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1` or use quick buttons:", components: [rrow]});
+                await interaction.reply({content:"Invalid dice formula. Example: **1d20**, **2d6+3**, up to 100 dice (sides 2-1000). \nTry `/roll 2d10+1` or use quick buttons:", components: [rrow], allowedMentions: { parse: [] }});
+
                 return;
             }
 
@@ -1609,7 +1634,8 @@ return;
             if (modmatches) for (let mod of modmatches) modifier += parseInt(mod,10);
 
             if (isNaN(num) || num<1 || num>100 || isNaN(sides) || sides<2 || sides>1000) {
-                await interaction.reply({content:"Dice count must be 1-100; sides 2-1000."}); return;
+                await interaction.reply({content:"Dice count must be 1-100; sides 2-1000.", allowedMentions: { parse: [] }}); return;
+
             }
             
             // Roll!
@@ -1671,6 +1697,7 @@ return;
                 await interaction.reply({content:"An error occurred while rolling dice.", allowedMentions: { parse: [] }});
 
             } catch {}
+
         }
         return;
     }
@@ -1684,6 +1711,7 @@ return;
             try { hist = await readJSONFile("roll_history.json", []); } catch {}
             hist = hist.filter(r => r.userId === interaction.user.id).slice(-10).reverse();
             if (!hist.length) return void interaction.reply({content:"No dice roll history found.", allowedMentions: { parse: [] }});
+
 
             let lines = hist.map((h,i) => `**${i+1}.** \`${h.formula}\` = ${h.resultMsg} _(at <t:${Math.floor(h.at/1000)}:t>)_`);
             let embed = new EmbedBuilder()
@@ -1704,6 +1732,7 @@ return;
             let histAll = [];
             try { histAll = await readJSONFile("roll_history.json", []); } catch {}
             if (!histAll.length) return void interaction.reply({content:"No roll stats yet!", allowedMentions: { parse: [] }});
+
 
             // Compute: who rolled the highest total; who rolled most; average roll per user (by sum of totals/number)
             let stats = {}, users = {};
@@ -1755,6 +1784,7 @@ return;
             return;
         }
         if (client._ongoingDiceWar && client._ongoingDiceWar[interaction.user.id]) {
+
             await interaction.reply({ content: `You already have a pending Dice War challenge! Wait for it to finish.`, allowedMentions: { parse: [] } });
 
             return;
@@ -1764,6 +1794,7 @@ return;
 
             return;
         }
+
         // Store challenge context (5min expiry)
         client._ongoingDiceWar = client._ongoingDiceWar || {};
         client._ongoingDiceWar[opponent.id] = {
@@ -1917,7 +1948,8 @@ return;
     if (interaction.isChatInputCommand() && interaction.commandName === "dicewarleaderboard") {
         let score = await readJSONFile("dicewar_leader.json", []);
         if (!score.length)
-            return void interaction.reply({content:"No Dice War games played yet."});
+            return void interaction.reply({content:"No Dice War games played yet.", allowedMentions: { parse: [] }});
+
         let lines = [];
         // Try to resolve usernames
         for (let i=0;i<score.length;i++) {
@@ -1962,6 +1994,7 @@ return;
     }
 
 
+
     // --- SLASH: 8BALL ---
     if (interaction.isChatInputCommand() && interaction.commandName === '8ball') {
         const q = interaction.options.getString('question');
@@ -1973,7 +2006,8 @@ return;
     // --- SLASH: SNIPE ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'snipe') {
         const lastDeleted = await db.get('SELECT * FROM message_logs WHERE deleted=1 ORDER BY createdAt DESC LIMIT 1');
-        if (!lastDeleted) return void interaction.reply({content:"No deleted messages found."});
+        if (!lastDeleted) return void interaction.reply({content:"No deleted messages found.", allowedMentions: { parse: [] }});
+
         const embed = new EmbedBuilder()
             .setTitle("🕵️ Last Deleted Message")
             .setDescription(lastDeleted.content || "*[no content]*")
@@ -2354,6 +2388,7 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({content:"Failed to compute roll stats.", allowedMentions: { parse: [] }});
 
             }
+
             return;
         }
         // quickroll_d6, quickroll_d20, or replay_roll_{formula}
@@ -2812,6 +2847,7 @@ client.on('interactionCreate', async interaction => {
 
 
 
+
     // Additional feature: context menu "Add to To-Do" on user messages
     if (interaction.isMessageContextMenuCommand?.() && interaction.commandName === "Add To-Do") {
         let msg = interaction.targetMessage;
@@ -2820,6 +2856,7 @@ client.on('interactionCreate', async interaction => {
 
         return;
     }
+
 
     // FUN FEATURE: Thumbs up/down reaction context menu
     if (interaction.isMessageContextMenuCommand?.() && (interaction.commandName === "Thumbs Up" || interaction.commandName === "Thumbs Down")) {
@@ -2895,16 +2932,19 @@ client.on('interactionCreate', async interaction => {
 
 
 
+
     // Suggestion voting feature
     if (interaction.isButton() && (/^suggest_(up|down)vote_/).test(interaction.customId)) {
         const [, type,, sugid] = interaction.customId.split("_");
         const sId = Number(sugid);
-        if (!sId) return void interaction.reply({content: "Invalid suggestion ID."});
+        if (!sId) return void interaction.reply({content: "Invalid suggestion ID.", allowedMentions: { parse: [] }});
+
         // Only allow voting once per user per suggestion
         let existing = await db.get(`SELECT * FROM reactions WHERE messageId=? AND userId=? AND reaction=?`,
             "suggestion_" + sId, interaction.user.id, `suggest:${type}`);
         if (existing) {
-            await interaction.reply({content: "You already voted on this suggestion."});
+            await interaction.reply({content: "You already voted on this suggestion.", allowedMentions: { parse: [] }});
+
             return;
         }
         // Upsert reaction, and update votes in suggestion table if necessary
@@ -2941,6 +2981,7 @@ client.on('interactionCreate', async interaction => {
 
             return;
         }
+
         let embed = new EmbedBuilder()
             .setTitle(isUp ? "🌟 Top Upvoted Messages" : "💢 Most Downvoted Messages")
             .setDescription(isUp ? "The most 'Thumbs Up' messages in this channel." : "Ouch! The most 'Thumbs Down' messages in this channel.");
@@ -3133,6 +3174,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 });
+
 
 
 
