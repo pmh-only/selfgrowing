@@ -2912,7 +2912,9 @@ try {
 
  // --- Startup reminder boot ---
 // Show top 5 most upvoted messages feature
-client.once('ready', () => {
+// On ready, post a welcome embed + button in the configured main channel (only if not already posted recently)
+// UX improvement: On startup, always (re)show the onboarding "Get Started" message in CHANNEL_ID
+client.once('ready', async () => {
 
     console.log(`Ready as ${client.user.tag}`);
     scheduleReminders(client);
@@ -2922,7 +2924,49 @@ client.once('ready', () => {
         type: 3, // "Watching"
         name: "slash commands! (/help)"
     });
+
+    try {
+        const chan = await client.channels.fetch(CHANNEL_ID);
+        // Try to find last 'Get Started' welcome message in the last 10 by this bot; if not present or >24h old, send again.
+        let msgs = await chan.messages.fetch({ limit: 10 });
+        let already = msgs.find(m=>
+            m.author.id === client.user.id &&
+            m.embeds?.[0]?.title === "Getting Started with this Bot"
+        );
+        // If not found or old, post anew.
+        if (!already || (Date.now() - (already.createdTimestamp||0) > 24*3600*1000)) {
+            await chan.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("Getting Started with this Bot")
+                        .setDescription([
+                            "**Slash Commands for Productivity & Fun**",
+                            "",
+                            "- `/todo add` — Pin new ideas, todos, short notes!",
+                            "- `/todo list`/`complete` — View and check-off your done tasks",
+                            "- `/note add` — Quick notes (in channel, visible to everyone)",
+                            "- `/remind` — Public channel reminders, even days in advance!",
+                            "- `/poll` — Admins: Create quick channel polls",
+                            "- `/xp` — Chat to earn XP & level up",
+                            "- `/8ball` — Ask for cosmic wisdom",
+                            "- `/avatar` — View yours or anyone's pfp",
+                            "- `/leaderboard` — Top chatters/XP",
+                            "- `/stats` — Bot usage and content stats",
+                            "- `/snipe` — See last deleted message (admin)",
+                            "",
+                            "🆕 **All user data public – `/todo` and `/note` work in main channel, all can see!**"
+                        ].join("\n"))
+                        .setColor(0xfacc15)
+                ],
+                components: [
+                    welcomeButtonRow
+                ]
+            });
+        }
+    } catch { }
+
 });
+
 
 
 

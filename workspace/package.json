@@ -1,7 +1,6 @@
 {
-  "name": "discordjs-private-bot",
+  "name": "discord-bot",
   "version": "1.0.0",
-  "description": "Private large-scale Discord bot with advanced features and full public UX. Single main.mjs entry, uses sqlite and /data/ persistence.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -9,21 +8,8 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "discord",
-    "bot",
-    "sqlite",
-    "fun",
-    "moderation",
-    "slash-commands"
-  ],
-  "author": "Your Name",
-  "license": "MIT"
+  }
 }
