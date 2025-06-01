@@ -1,16 +1,16 @@
 {
-  "name": "discord-advanced-singlefilebot",
+  "name": "large-scale-discordjs-bot",
   "version": "1.0.0",
-  "description": "A large-scale Discord bot in a single file using discord.js, sqlite, and other utilities.",
   "type": "module",
   "main": "main.mjs",
+  "description": "A large scale modern Discord bot with public admin/demo features and persistent sqlite/file storage.",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6",
     "humanize-duration": "^3.29.0"
   },
   "engines": {

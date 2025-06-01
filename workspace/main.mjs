@@ -352,14 +352,14 @@ const contextCommands = [
         // ... previous commands ...
         {
             name: 'note',
-            description: 'Add/view/delete personal notes privately.',
+            description: 'Add/view/delete personal notes publicly in channel.',
             options: [
-                { name: 'add', type: 1, description: 'Add a private note', options:[{name:'content',type:3,description:'Your note',required:true}]},
-                { name: 'list', type: 1, description: 'View your private notes'},
+                { name: 'add', type: 1, description: 'Add a public note', options:[{name:'content',type:3,description:'Your note',required:true}]},
+                { name: 'list', type: 1, description: 'View recent public notes'},
                 { name: 'delete', type: 1, description: 'Delete a note by its number', options: [{name:"number",type:4,description:"Note number from /note list",required:true}]},
                 { name: 'pin', type: 1, description: 'Pin a note by its number', options: [{name:"number",type:4,description:"Note # to pin",required:true}]},
                 { name: 'pinned', type: 1, description: 'View your pinned notes'},
-                { name: 'search', type: 1, description: 'Search your notes', options: [{name:"query",type:3,description:"Search text",required:true}]}
+                { name: 'search', type: 1, description: 'Search public notes', options: [{name:"query",type:3,description:"Search text",required:true}]}
             ]
         },
         {
@@ -437,7 +437,7 @@ const contextCommands = [
     },
     {
         name: "todo",
-        description: "Personal to-do list, only in DM",
+        description: "Manage a public to-do list in the main channel",
         options: [
             { name:'add',type:1, description:"Add a new to-do", options:[
               { name:'content', type:3, description:"To-do description", required:true }
@@ -448,13 +448,14 @@ const contextCommands = [
             { name:'remove', type:1, description:"Delete a to-do item", options:[
                 { name: 'number', type:4, description:"To-do item number", required:true }
             ]},
-            { name:'list', type:1, description:"List your current to-dos" },
+            { name:'list', type:1, description:"List the public to-do items" },
             { name:'edit', type:1, description:"Edit a to-do", options:[
                 { name:'number', type:4, description:"To-do item number", required:true },
                 { name:'content', type:3, description:"New content", required:true }
             ]}
         ]
     },
+
 
     {
         name: "dmuser",
