@@ -1,9 +1,9 @@
 {
-  "name": "big-discord-bot",
+  "name": "discord-private-bot",
   "version": "1.0.0",
-  "description": "Large-scale Discord bot with sqlite and advanced features",
   "type": "module",
   "main": "main.mjs",
+  "description": "A feature-rich private Discord bot with public user tools, SQLite storage, and slash command UX.",
   "scripts": {
     "start": "node main.mjs"
   },
@@ -11,12 +11,10 @@
     "discord.js": "^14.14.1",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.29.0",
+    "humanize-duration": "^3.30.0",
     "node-fetch": "^3.3.2"
   },
   "engines": {
-    "node": ">=18"
-  },
-  "author": "",
-  "license": "MIT"
+    "node": ">=18.0.0"
+  }
 }

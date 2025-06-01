@@ -1524,11 +1524,24 @@ return;
 
         await db.run('INSERT INTO reminders(userId, content, remindAt) VALUES (?,?,?)',
             interaction.user.id, content, Date.now() + delay);
-        await interaction.reply({content:`⏰ Reminder set! I'll remind **in the main channel** in ${humanizeMs(delay)}.`, allowedMentions: { parse: [] }});
+
+        // Additional Feature: Confirm with persistent reminder view button (UX improvement)
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('reminders_view_btn')
+                .setLabel('View All Reminders')
+                .setStyle(ButtonStyle.Primary)
+        );
+        await interaction.reply({
+            content:`⏰ Reminder set! I'll remind **in the main channel** in ${humanizeMs(delay)}.`,
+            components: [row],
+            allowedMentions: { parse: [] }
+        });
 
         scheduleReminders(client);
         return;
     }
+
 
 
 
@@ -3543,7 +3556,26 @@ process.on("unhandledRejection", err => {
 
 // Listen for admin command: update blocklist dynamically (moderation tool, slash command)
 
+// [Additional Feature: Reminders View Button]
 client.on('interactionCreate', async interaction => {
+    // Button handler for viewing reminders in public (UX improv)
+    if (interaction.isButton() && interaction.customId === 'reminders_view_btn') {
+        // List the user's reminders in the main channel (public context)
+        let rows = await db.all('SELECT content, remindAt FROM reminders WHERE userId=? ORDER BY remindAt ASC', interaction.user.id);
+        if (!rows.length) {
+            await interaction.reply({ content: "You have no pending reminders!", allowedMentions: { parse: [] } });
+        } else {
+            let embed = new EmbedBuilder()
+                .setTitle(`⏰ Your Pending Reminders`)
+                .setDescription(
+                    rows.map((r, i) => `**[${i+1}]** ${r.content} (in <t:${Math.floor(r.remindAt/1000)}:R>)`).join('\n')
+                )
+                .setColor(0xc084fc);
+            await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
     // FIX: Guard .member on permission checks for admin DM/system
     if (
         typeof interaction.isChatInputCommand === "function" &&
@@ -3588,6 +3620,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 });
+
 
 
 
