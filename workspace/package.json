@@ -1,18 +1,18 @@
 {
-  "name": "large-scale-discord-bot",
+  "name": "discord-js-private-bot",
   "version": "1.0.0",
-  "description": "A large scale Discord bot using discord.js, sqlite, and advanced features.",
   "type": "module",
+  "description": "A large-scale Discord.js bot for a private, single-channel environment.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.13.0",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.29.0",
-    "node-fetch": "^2.6.12"
+    "humanize-duration": "^3.31.0",
+    "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18.0.0"

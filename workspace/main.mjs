@@ -171,6 +171,7 @@ await db.run(`CREATE TABLE IF NOT EXISTS user_tags (
 // Patch: on startup, close out any expired leftover polls (shouldn't be possible, but for data consistency)
 // Protect against case client not initialized yet
 let leftOpenPolls = [];
+/*
 try {
     leftOpenPolls = await db.all(`SELECT * FROM poll WHERE expiresAt IS NOT NULL AND expiresAt < ?`, Date.now());
     for (const pollRec of leftOpenPolls) {
@@ -181,6 +182,10 @@ try {
         } catch {}
     }
 } catch {}
+*/
+// Defer closing of expired polls until client is ready (fix: client not defined yet!)
+// Moved to client.once('ready') below.
+
 
 
 await db.run(`CREATE TABLE IF NOT EXISTS message_logs (
@@ -3583,6 +3588,18 @@ client.once('ready', async () => {
     console.log(`Ready as ${client.user.tag}`);
     scheduleReminders(client);
 
+    // ------ [NEW FEATURE] Close expired polls after client ready ------
+    try {
+        let leftOpenPolls = await db.all(`SELECT * FROM poll WHERE expiresAt IS NOT NULL AND expiresAt < ?`, Date.now());
+        for (const pollRec of leftOpenPolls) {
+            try {
+                const chan = await client.channels.fetch(pollRec.channelId);
+                await finishPoll(pollRec, chan);
+            } catch {}
+        }
+    } catch {}
+    // ---------------------------------------------------------------
+
     // Custom status
     client.user.setActivity({
         type: 3, // "Watching"
@@ -3630,6 +3647,7 @@ client.once('ready', async () => {
     } catch { }
 
 });
+
 
 
 
