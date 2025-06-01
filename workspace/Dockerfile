@@ -1,11 +1,11 @@
 FROM alpine
 WORKDIR /app/
 
-RUN apk add --no-cache nodejs pnpm
+RUN apk add --no-cache nodejs npm
 
 COPY package.json  .
 
-RUN pnpm i
+RUN npm i
 
 COPY main.mjs  .
 

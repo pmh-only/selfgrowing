@@ -1926,6 +1926,8 @@ client.on('messageCreate', async msg => {
 });
 
 
+client.on('interactionCreate', async interaction => {
+    
 
 // --- POLL & DICE-GAME BUTTON HANDLERS ---
     // --- DICE ROLL BUTTONS (roll again, quick roll, leaderboard) ---
@@ -2047,7 +2049,6 @@ client.on('messageCreate', async msg => {
         return;
     }
 
-client.on('interactionCreate', async interaction => {
 
     // --- DICE GAME: HIGHEST MULTIPLAYER JOIN/START/CANCEL
     if (interaction.isButton() && /^join_dicegame_|^start_dicegame_|^cancel_dicegame_/.test(interaction.customId)) {
