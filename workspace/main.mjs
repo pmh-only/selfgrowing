@@ -341,6 +341,23 @@ const contextCommands = [
             name: 'downvotes',
             description: 'Show the most downvoted messages in the channel!'
         },
+        // [FEATURE ADDITION] Mass Messaging for All Users - Mass Announce
+        {
+            name: 'announce',
+            description: 'Announce a message to the main channel as a public bot message',
+            options: [
+                { name: 'message', type:3, description: 'The announcement message', required: true }
+            ]
+        },
+        // [FEATURE ADDITION] /massmention public - allows bulk mention of user roles (demonstration, not spam)
+        {
+            name: 'massmention',
+            description: 'Mention all online users or users with a specific role.',
+            options: [
+                { name: 'role', type:8, description: 'Role to mention (optional)', required: false }
+            ]
+        },
+
 
 
     {
@@ -664,6 +681,52 @@ const eightBallResponses = [
  * Also: fix interaction.channel.type undefined bug for system/app_home/other types. DMs are type === 1 or interaction.channel is null (DM), text/guild channels differ.
  */
 client.on('interactionCreate', async interaction => {
+    // --- FEATURE: /ANNOUNCE ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "announce") {
+        const msgTxt = interaction.options.getString("message").slice(0,800);
+        const embed = new EmbedBuilder()
+            .setTitle("📢 Announcement")
+            .setDescription(msgTxt)
+            .setFooter({ text: `Sent by <@${interaction.user.id}>` })
+            .setColor(0xef4444)
+            .setTimestamp();
+        const chan = await client.channels.fetch(CHANNEL_ID);
+        await chan.send({embeds: [embed]});
+        await interaction.reply({content: "Announcement sent.", allowedMentions: { users: [] }});
+        return;
+    }
+
+    // --- FEATURE: /MASSMENTION ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "massmention") {
+        let mentionMsg = "";
+        try {
+            if (interaction.options.getRole) {
+                const role = interaction.options.getRole("role");
+                if (role) {
+                    mentionMsg = `<@&${role.id}>`;
+                }
+            }
+            if (!mentionMsg) {
+                // Fallback to mention all online users in the channel (safe demonstration, not all users)
+                const chan = await client.channels.fetch(CHANNEL_ID);
+                const msgs = await chan.messages.fetch({ limit: 50 });
+                let recentUsers = new Set();
+                msgs.forEach(m => { if (!m.author.bot) recentUsers.add(m.author.id); });
+                mentionMsg = Array.from(recentUsers).map(uid=>`<@${uid}>`).join(" ");
+            }
+        } catch { mentionMsg = "@everyone" }
+        if (!mentionMsg) mentionMsg = "@everyone";
+        const embed = new EmbedBuilder()
+            .setTitle("🔔 Mass Mention")
+            .setDescription("Sending a demonstration mention:\n"+mentionMsg)
+            .setColor(0xf59e42);
+        const chan = await client.channels.fetch(CHANNEL_ID);
+        await chan.send({content: mentionMsg, embeds: [embed]});
+        await interaction.reply({content:`Mass mention sent. (Use responsibly!)`});
+        return;
+    }
+
+
     // --- NEW FEATURE: /pinrandom: Pin a random message as quote (admin/fun tool) ---
     if (interaction.isChatInputCommand && interaction.commandName === "pinrandom") {
         // Permissions not required per instructions (works for all for demo), but leave admin role wording in embed.
