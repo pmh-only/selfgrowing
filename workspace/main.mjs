@@ -367,6 +367,20 @@ const contextCommands = [
             name: 'rps-stats',
             description: 'Show Rock Paper Scissors leaderboard & stats'
         },
+        // --- ADDITIONAL FEATURE: CALCULATOR COMMAND ---
+        {
+            name: 'calc',
+            description: "Calculate simple math expressions, e.g. 1+2*5.",
+            options: [
+                {
+                    name: 'expression',
+                    type: 3,
+                    description: 'Enter your math expression (e.g. 2+2*3/4)',
+                    required: true
+                }
+            ]
+        },
+
 
 
     {
@@ -1475,6 +1489,37 @@ return;
 
     // --- SLASH: ROLL ---
 // UX improvement: more robust/clear error for empty input; add special "roll for initiative" preset
+
+    // --- [ADDITIONAL FEATURE: CALC SLASH COMMAND IMPLEMENTATION] ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'calc') {
+        // Calculate a user-provided math expression safely
+        const expression = interaction.options.getString('expression');
+        // Input sanitization: only allow numbers, + - * / ( ) . ^ and spaces
+        if (!/^[\d\s\+\-\*\/\(\)\.\^]+$/.test(expression)) {
+            await interaction.reply({content: 'Invalid characters. Only numbers, (+-*/.^), parentheses, and spaces allowed.', allowedMentions: { parse: [] }});
+            return;
+        }
+        try {
+            // Replace '^' with '**' for exponentiation, then eval
+            const safeExpr = expression.replace(/\^/g, '**');
+            // eslint-disable-next-line no-eval
+            let result = eval(safeExpr);
+            // Provide math breakdown for common cases, else show raw result
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🧮 Calculation Result")
+                        .setDescription(`\`${expression}\` = **${result}**`)
+                        .setColor(0x47d677)
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({content: 'Failed to calculate. Double-check your math!', allowedMentions: { parse: [] }});
+        }
+        return;
+    }
+
     if (interaction.isChatInputCommand() && interaction.commandName === "suggest") {
         // Suggestion feature: add suggestion to db and post it for voting
         const text = interaction.options.getString("text")?.trim();
@@ -1546,6 +1591,8 @@ return;
         await interaction.reply({embeds: embeds.slice(0,3)});
         return;
     }
+
+
 
 
     // --- SLASH: SUGGESTHANDLE ---
