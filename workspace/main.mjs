@@ -59,67 +59,105 @@ import { Client, GatewayIntentBits, Partials, REST, Routes, InteractionType, Per
         return;
     }
 
-// === [ FEATURE: REPORT DELETE BUTTON HANDLER ] ===
+// === [ FEATURE: REPORT DELETE BUTTON HANDLER & WARNING DELETE BUTTON HANDLER ] ===
 client.on('interactionCreate', async interaction => {
-    if (interaction.isButton() && interaction.customId.startsWith('delete_report_')) {
-        // Only allow in main channel as always per restrictions
-        let msgId = interaction.customId.slice('delete_report_'.length);
+    // --- Report delete via number index or messageId ---
+    if (interaction.isButton() && (
+        interaction.customId.startsWith('delete_report_') ||
+        interaction.customId.startsWith('delete_report_num_')
+    )) {
         let reports = [];
         try { reports = await readJSONFile("reports.json", []); } catch {}
-        // Find last matching messageId (could be multiple; delete last)
         let idx = -1;
-        for (let i = reports.length-1; i >= 0; --i) {
-            if (reports[i].messageId === msgId) {
-                idx = i; break;
+        if (interaction.customId.startsWith('delete_report_num_')) {
+            // Button: delete by display index (as seen in UI): count back from end
+            let displayIdx = parseInt(interaction.customId.slice('delete_report_num_'.length), 10); // 1-based idx
+            if (isNaN(displayIdx) || displayIdx < 1) {
+                await interaction.reply({ content: "Invalid report number!", allowedMentions: { parse: [] }});
+                return;
             }
-        }
-        if (idx === -1) {
-            await interaction.reply({ content: "No such report found to delete.", allowedMentions: { parse: [] } });
-            return;
+            // Slice last 10, then find corresponding index in reports (since reversed)
+            const last10 = reports.slice(-10);
+            idx = reports.length - last10.length + (last10.length - displayIdx);
+            if (idx < 0 || idx >= reports.length) {
+                await interaction.reply({ content: "Report number not found.", allowedMentions: { parse: [] }});
+                return;
+            }
+        } else if (interaction.customId.startsWith('delete_report_')) {
+            // legacy: delete by messageId (last occurrence)
+            let msgId = interaction.customId.slice('delete_report_'.length);
+            for (let i = reports.length-1; i >= 0; --i) {
+                if (reports[i].messageId === msgId) {
+                    idx = i; break;
+                }
+            }
+            if (idx === -1) {
+                await interaction.reply({ content: "No such report found to delete.", allowedMentions: { parse: [] } });
+                return;
+            }
         }
         reports.splice(idx,1);
         await saveJSONFile("reports.json", reports);
-        await interaction.reply({ content: "Latest report has been deleted.", allowedMentions: { parse: [] } });
+        await interaction.reply({ content: "Report has been deleted.", allowedMentions: { parse: [] } });
+        return;
+    }
+
+    // --- Warning delete via button ---
+    if (interaction.isButton() && interaction.customId.startsWith('delete_warning_')) {
+        let wid = interaction.customId.slice('delete_warning_'.length);
+        if (!wid) {
+            await interaction.reply({ content: "Invalid warning ID.", allowedMentions: { parse: [] } });
+            return;
+        }
+        try {
+            // Delete directly from warnings table
+            await db.run('DELETE FROM warnings WHERE id=?', wid);
+            await interaction.reply({ content: "Warning has been deleted.", allowedMentions: { parse: [] } });
+        } catch {
+            await interaction.reply({ content: "Failed to delete warning.", allowedMentions: { parse: [] } });
+        }
         return;
     }
 });
 
+
 // --- SLASH: REPORTS (view all public reports) ---
     if (interaction.isChatInputCommand && interaction.commandName === "reports") {
-        // Anyone can view recent public reports
+        // Anyone can view recent public reports; add delete button per report (up to 5 for moderation transparency)
         let reports = [];
         try { reports = await readJSONFile("reports.json", []); } catch {}
         if (!reports.length) {
             await interaction.reply({ content: "No message reports yet!", allowedMentions: { parse: [] } });
             return;
         }
-        //==== New Feature: "report delete" button to allow public deletion of the most recent report (UX moderation tool) ====
-        const latestReport = reports.length ? reports[reports.length-1] : null;
-        let actionRow = null;
-        if (latestReport) {
-            actionRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('delete_report_' + latestReport.messageId).setLabel('Delete Most Recent Report').setStyle(ButtonStyle.Danger)
-            );
-        }
-        let embed = new EmbedBuilder()
+        // List last 10, newest first; allow delete by # via buttons for up to 5
+        const repRows = reports.slice(-10).reverse().map((r,i)=>({...r, displayIndex: i+1 }));
+        const embed = new EmbedBuilder()
             .setTitle("🚩 Recent Message Reports")
-            .setDescription(reports.slice(-10).reverse().map((r, i) =>
-                `**[${i+1}]** Reporter: ${r.reporterName}\nMessage ID: ${r.messageId}` +
+            .setDescription(repRows.map(r =>
+                `**[${r.displayIndex}]** Reporter: ${r.reporterName}\nMessage ID: ${r.messageId}` +
                 (r.reportedAuthorName ? `\nAuthor: ${r.reportedAuthorName}` : "") +
-                `\nContent: ${r.reportedContent.slice(0,80)}\nReason: ${r.reason}\nAt: <t:${Math.floor(r.reportedAt/1000)}:f>\n`
+                `\nContent: ${r.reportedContent.slice(0,80)}\nReason: ${r.reason}\nAt: <t:${Math.floor(r.reportedAt/1000)}:f>`
             ).join('\n\n'))
             .setColor(0xffbdbd)
             .setFooter({ text: "Reports are public, for transparency." });
-        await interaction.reply({ embeds: [embed], components: actionRow ? [actionRow] : [], allowedMentions: { parse: [] } });
+        const actionRow = new ActionRowBuilder().addComponents(
+            repRows.slice(0,5).map(r =>
+                new ButtonBuilder().setCustomId('delete_report_num_' + r.displayIndex).setLabel(`Delete #${r.displayIndex}`).setStyle(ButtonStyle.Danger)
+            )
+        );
+        await interaction.reply({ embeds: [embed], components: repRows.length ? [actionRow] : [], allowedMentions: { parse: [] } });
         return;
     }
 
 
+
+
 // --- ADD: MODERATION FEATURE - /warns (Public warning history summary) ---
     if (interaction.isChatInputCommand && interaction.commandName === "warns") {
-        // Show all warnings in the server (last 10, public, usernames only)
+        // Show all warnings in the server (last 10, public, usernames only) + allow delete by number (admin/all)
         let warnings = [];
-        try { warnings = await db.all('SELECT userId, reason, timestamp FROM warnings ORDER BY timestamp DESC LIMIT 10'); } catch {}
+        try { warnings = await db.all('SELECT id, userId, reason, timestamp FROM warnings ORDER BY timestamp DESC LIMIT 10'); } catch {}
         if (!warnings.length) {
             await interaction.reply({ content: "No warnings issued yet!", allowedMentions: { parse: [] } });
             return;
@@ -133,16 +171,38 @@ client.on('interactionCreate', async interaction => {
                 userNameMap[w.userId] = w.userId;
             }
         }
+        const warnRows = warnings.map((w, i)=> ({
+            ...w,
+            displayIndex: i+1
+        }));
         let embed = new EmbedBuilder()
             .setTitle("⚠️ Recent User Warnings")
-            .setDescription(warnings.map((w, i) =>
-                `**[${i+1}]** User: ${userNameMap[w.userId]}\nReason: ${w.reason}\nAt: <t:${Math.floor(w.timestamp/1000)}:f>`
+            .setDescription(warnRows.map((w) =>
+                `**[${w.displayIndex}]** User: ${userNameMap[w.userId]}\nReason: ${w.reason}\nAt: <t:${Math.floor(w.timestamp/1000)}:f>`
             ).join("\n\n"))
             .setColor(0xffc34d)
             .setFooter({ text: "All warnings are public for transparency." });
-        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        const actionRow = new ActionRowBuilder().addComponents(
+            warnRows.map(w =>
+                new ButtonBuilder()
+                    .setCustomId(`delete_warning_${w.id}`)
+                    .setLabel(`Delete #${w.displayIndex}`)
+                    .setStyle(ButtonStyle.Danger)
+            ).slice(0,5)
+        );
+        await interaction.reply({
+            embeds: [embed],
+            components: warnRows.length ? [actionRow] : [],
+            allowedMentions: { parse: [] }
+        });
         return;
     }
+
+
+
+
+
+
 
 
 
@@ -1801,18 +1861,40 @@ return;
     // --- SLASH: WARNINGS ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'warnings') {
         const tgt = interaction.options.getUser('user');
-        const rows = await db.all('SELECT reason, timestamp FROM warnings WHERE userId=? ORDER BY id DESC LIMIT 10', tgt.id);
-        if (rows.length === 0) await interaction.reply({content:"No warnings for this user!", allowedMentions: { parse: [] }});
-
-        else {
-            const embed = new EmbedBuilder()
-                .setTitle(`${tgt.tag}'s last 10 warnings`)
-                .setDescription(rows.map(r=>`• ${r.reason} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
-                .setColor(0xd13a29);
-            await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
+        // List all warnings for this user, let anyone delete by number - new UX (public moderation tool)
+        let rows = await db.all('SELECT id, reason, timestamp FROM warnings WHERE userId=? ORDER BY id DESC LIMIT 10', tgt.id);
+        if (rows.length === 0) {
+            await interaction.reply({content:"No warnings for this user!", allowedMentions: { parse: [] }});
+            return;
         }
+        // Build delete buttons: one per warning
+        const warnRows = rows.map((r, idx) => ({
+            ...r,
+            displayIndex: idx+1 // for public-facing numbering
+        }));
+        const embed = new EmbedBuilder()
+            .setTitle(`${tgt.tag}'s last 10 warnings`)
+            .setDescription(warnRows.map(w=>
+                `**[${w.displayIndex}]** ${w.reason} _(at <t:${Math.floor(w.timestamp/1000)}:f>)_`
+            ).join("\n"))
+            .setColor(0xd13a29);
+        // Add a button row only if there are warnings
+        const actionRow = new ActionRowBuilder().addComponents(
+            warnRows.map(w =>
+                new ButtonBuilder()
+                    .setCustomId(`delete_warning_${w.id}`)
+                    .setLabel(`Delete #${w.displayIndex}`)
+                    .setStyle(ButtonStyle.Danger)
+            ).slice(0,5)
+        );
+        await interaction.reply({
+            embeds:[embed],
+            components: warnRows.length ? [actionRow] : [],
+            allowedMentions: { parse: [] }
+        });
         return;
     }
+
 
     // --- SLASH: CLEARWARNINGS ---
     if (interaction.isChatInputCommand() && interaction.commandName === "clearwarnings") {

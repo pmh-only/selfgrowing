@@ -1,22 +1,31 @@
 {
-  "name": "discordjs-largebot",
+  "name": "discord-private-bot",
   "version": "1.0.0",
-  "description": "A large scale Discord bot with SQLite, public UX and no mention policy.",
   "type": "module",
+  "description": "A large scale, single-file, slash-command Discord bot with persistent data for a single guild and channel.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.13.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
+    "fs-extra": "^11.2.0",
     "humanize-duration": "^3.29.0",
     "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "YourName",
+  "keywords": [
+    "discord",
+    "bot",
+    "sqlite",
+    "slash-commands",
+    "single-channel",
+    "guild"
+  ],
+  "author": "Your Name",
   "license": "MIT"
 }
