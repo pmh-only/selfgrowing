@@ -322,9 +322,12 @@ New UX/features added in this SEARCH/REPLACE update:
 
 
 import path from 'path';
+// Node.js fetch (polyfill for joke API)
+import fetch from 'node-fetch';
 
 // Add context menu (right click) commands for message/user actions
 const contextCommands = [
+
     {
         name: 'Mute XP',
         type: 2, // USER context menu
@@ -803,6 +806,7 @@ client.on('interactionCreate', async interaction => {
         } catch { uname = interaction.user.id; }
         await db.run("INSERT INTO feedback(userId, username, text, createdAt, voters) VALUES (?,?,?,?,?)",
             interaction.user.id, uname || interaction.user.id, fbText, Date.now(), JSON.stringify([]));
+
         const lastId = (await db.get("SELECT id FROM feedback ORDER BY id DESC LIMIT 1"))?.id;
         const embed = new EmbedBuilder()
             .setTitle("🗣️ New Public Feedback")

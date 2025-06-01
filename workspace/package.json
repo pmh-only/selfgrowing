@@ -1,18 +1,31 @@
 {
-  "name": "discord-largebot",
+  "name": "large-scale-discordjs-bot",
   "version": "1.0.0",
-  "description": "A large-scale Discord bot using discord.js, sqlite, and other productivity & fun features.",
   "type": "module",
   "main": "main.mjs",
+  "description": "A large-scale Discord.js bot with advanced features and public user tools.",
   "scripts": {
     "start": "node main.mjs"
   },
-  "author": "Your Name",
-  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.29.0"
-  }
+    "sqlite3": "^5.1.6",
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "discord",
+    "discord-bot",
+    "bot",
+    "discord.js",
+    "sqlite",
+    "productivity",
+    "fun"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
 }
