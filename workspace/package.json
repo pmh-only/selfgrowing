@@ -1,21 +1,19 @@
 {
-  "name": "discord-bot-large",
+  "name": "discordjs-single-main",
   "version": "1.0.0",
-  "type": "module",
-  "description": "A large scale Discord bot with advanced features in a single main.mjs file.",
+  "description": "Large scale Discord bot with all features in main.mjs",
   "main": "main.mjs",
+  "type": "module",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.32.1"
+    "sqlite": "^5.1.1",
+    "humanize-duration": "^3.30.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "author": "YourName",
-  "license": "MIT"
+  }
 }

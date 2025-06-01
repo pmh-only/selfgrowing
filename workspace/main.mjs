@@ -438,6 +438,16 @@ const contextCommands = [
         description: "Pick a random message and save as quote (fun admin tool)",
         default_member_permissions: (PermissionFlagsBits.ManageMessages).toString()
     },
+    // [NEW]: DAILY REWARD feature
+    {
+        name: "daily",
+        description: "Claim your daily reward and keep your streak going!"
+    },
+    {
+        name: "dailyleaderboard",
+        description: "Show Daily Reward top streak leaderboard"
+    },
+
 
     {
         name: "quotes",
@@ -2345,11 +2355,14 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isButton() && (
         /^replay_roll_/.test(interaction.customId) ||
         /^quickroll_(d6|d20)/.test(interaction.customId) ||
-        /^roll_leaderboard$/.test(interaction.customId)
+        /^roll_leaderboard$/.test(interaction.customId) ||
+        /^daily_leaderboard$/.test(interaction.customId)
     )) {
 
 
+
         if (/^roll_leaderboard$/.test(interaction.customId)) {
+
             // Re-use /rollstats logic, but as embed here!
             try {
                 let histAll = [];
@@ -2391,7 +2404,36 @@ client.on('interactionCreate', async interaction => {
 
             return;
         }
+        if (/^daily_leaderboard$/.test(interaction.customId)) {
+            // Reuse leaderboard code from /dailyleaderboard
+            try {
+                await db.run(`CREATE TABLE IF NOT EXISTS daily_rewards (
+                    userId TEXT NOT NULL,
+                    lastClaim INTEGER NOT NULL,
+                    streak INTEGER NOT NULL DEFAULT 0,
+                    bestStreak INTEGER NOT NULL DEFAULT 0,
+                    totalClaims INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(userId)
+                )`);
+            } catch {}
+            let rows = await db.all("SELECT * FROM daily_rewards ORDER BY streak DESC, bestStreak DESC, totalClaims DESC LIMIT 5");
+            if (!rows || !rows.length) {
+                await interaction.reply({ content: "No daily rewards data yet!", allowedMentions: { parse: [] } });
+                return;
+            }
+            let embed = new EmbedBuilder()
+                .setTitle("🏅 Daily Reward Leaderboard")
+                .setColor(0xfacc15)
+                .setDescription(
+                    rows.map((r, i) =>
+                        `#${i + 1}: <@${r.userId}> — Streak: **${r.streak}**, Best: **${r.bestStreak}**, Total: **${r.totalClaims}**`
+                    ).join("\n")
+                );
+            await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+            return;
+        }
         // quickroll_d6, quickroll_d20, or replay_roll_{formula}
+
         let formula;
         if (/^quickroll_d6$/.test(interaction.customId)) formula = "1d6";
         else if (/^quickroll_d20$/.test(interaction.customId)) formula = "1d20";
