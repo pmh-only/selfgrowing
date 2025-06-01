@@ -1,15 +1,19 @@
 {
-  "name": "discord-advanced-bot",
+  "name": "discord-bot",
   "version": "1.0.0",
-  "type": "module",
+  "description": "A powerful Discord bot with admin, fun, productivity, and moderation tools.",
   "main": "main.mjs",
+  "type": "module",
   "scripts": {
     "start": "node main.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
-    "sqlite": "^5.1.1",
+    "sqlite": "5.1.1",
     "humanize-duration": "^3.29.0"
   }
 }

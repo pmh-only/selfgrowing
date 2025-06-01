@@ -374,9 +374,14 @@ const contextCommands = [
             { name:'remove', type:1, description:"Delete a to-do item", options:[
                 { name: 'number', type:4, description:"To-do item number", required:true }
             ]},
-            { name:'list', type:1, description:"List your current to-dos" }
+            { name:'list', type:1, description:"List your current to-dos" },
+            { name:'edit', type:1, description:"Edit a to-do", options:[
+                { name:'number', type:4, description:"To-do item number", required:true },
+                { name:'content', type:3, description:"New content", required:true }
+            ]}
         ]
     },
+
     {
         name: "dmuser",
         description: "Send a DM to a user (admin only)",
@@ -1014,26 +1019,19 @@ return;
             let doneCount = todos.filter(t=>t.done).length;
             embed.setFooter({text:`${todos.length} total, ${doneCount} completed, ${todos.length-doneCount} remaining`});
             await interaction.reply({embeds:[embed]});
+        } else if (sub === "edit") {
+            let idx = interaction.options.getInteger('number');
+            let newContent = interaction.options.getString('content').substring(0, 300);
+            let rows = await db.all("SELECT id, content, userId FROM todo_entries ORDER BY ts DESC LIMIT 15");
+            if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
+            let todoId = rows[idx-1].id;
+            let oldContent = rows[idx-1].content;
+            await db.run("UPDATE todo_entries SET content=?, ts=? WHERE id=?", newContent, Date.now(), todoId);
+            await interaction.reply({content: `✏️ To-Do item #${idx} updated.\nBefore: "${oldContent}"\nAfter: "${newContent}"`});
         }
         return;
     }
 
-    // --- SLASH: EDITTODO (NEW FEATURE) ---
-    if (interaction.isChatInputCommand() && interaction.commandName === 'edittodo') {
-        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
-            await interaction.reply({content:"Edit To-Do is available only in the main channel.", ephemeral:false});
-            return;
-        }
-        let idx = interaction.options.getInteger('number');
-        let newContent = interaction.options.getString('content').substring(0, 300);
-        let rows = await db.all("SELECT id, content, userId FROM todo_entries ORDER BY ts DESC LIMIT 15");
-        if (!rows[idx-1]) return void interaction.reply({content:"Invalid to-do #"});
-        let todoId = rows[idx-1].id;
-        let oldContent = rows[idx-1].content;
-        await db.run("UPDATE todo_entries SET content=?, ts=? WHERE id=?", newContent, Date.now(), todoId);
-        await interaction.reply({content: `✏️ To-Do item #${idx} updated.\nBefore: "${oldContent}"\nAfter: "${newContent}"`});
-        return;
-    }
 
 
 
