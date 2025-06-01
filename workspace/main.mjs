@@ -2968,14 +2968,6 @@ client.on('messageCreate', async msg => {
         userWelcomeStatus[msg.author.id] = true;
         return;
     }
-
-    if (msg.content.startsWith('/help')) {
-        await msg.reply(`Available commands:\n- /note\n- /note search\n- /todo\n- /remind\n- /poll\n- /timer\n- /timers\n- /quotes\n\n⭐ Use /todo to pin favorites and stay organized!`);
-    } else if (/timer/i.test(msg.content)) {
-        await msg.reply("Try `/timer` to set a channel countdown for yourself, or `/timers` to view your timers!");
-    } else {
-        await msg.reply(`Hi! Slash commands available: /todo, /note, /note search, /remind, /poll, /timer, /quotes, games & more! (Type \`/\` to see all options, or click **Get Started** below.)`);
-    }
 });
 
 
