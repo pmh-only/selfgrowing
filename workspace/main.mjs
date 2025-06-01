@@ -341,6 +341,24 @@ const contextCommands = [
             name: 'downvotes',
             description: 'Show the most downvoted messages in the channel!'
         },
+        // [ADDED: COMMAND REGISTRATION MISSING] Add missing suggesthandle and rps-stats public commands
+        {
+            name: 'suggesthandle',
+            description: 'Admin: Mark a suggestion as handled',
+            options: [
+                { name: 'suggestion_id', type: 4, description: "Suggestion ID", required: true },
+                { name: 'status', type: 3, description: "Status", required: true, choices: [
+                    { name: "Approved", value: "approved" },
+                    { name: "Rejected", value: "rejected" },
+                    { name: "Handled", value: "handled" }
+                ]}
+            ]
+        },
+        {
+            name: 'rps-stats',
+            description: 'Show Rock Paper Scissors leaderboard & stats'
+        },
+
 
     {
         name: "poll",
@@ -1982,7 +2000,9 @@ let lastMessageUserCache = {};
 })();
 
 
-// ---- SLASH: STICKY (moved here for single on-interaction handler) ----
+/* --- SLASH: STICKY (moved here for single on-interaction handler) ---
+   [UX fix: remove @ mentions from sticky message announcement, use username]
+*/
 client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand() && interaction.commandName === "sticky") {
         // Permissions not required - all users are 'admin' for demonstration
@@ -2002,13 +2022,21 @@ client.on('interactionCreate', async interaction => {
             let stickyMsgs = await chan.messages.fetch({ limit: 10 });
             let prev = stickyMsgs.find(m=>m.author.id===client.user.id && m.content.startsWith("__**Sticky Message**__"));
             if (prev) await prev.delete();
+            // Fetch username, fallback to userId
+            let uname;
+            try {
+                let user = await client.users.fetch(interaction.user.id);
+                uname = user.username;
+            } catch { uname = interaction.user.id; }
             await chan.send({
-                content: `__**Sticky Message**__\n${msg}\n*(set by <@${interaction.user.id}>)*`
+                content: `__**Sticky Message**__\n${msg}\n*(set by ${uname})*`,
+                allowedMentions: { parse: [] }
             });
         } catch{}
         return;
     }
 });
+
 
 
 
@@ -2040,8 +2068,14 @@ client.on('messageCreate', async msg => {
             if (!client._lastSticky || Date.now() - client._lastSticky > 60000*2) { // 2 minutes anti-spam
                 client._lastSticky = Date.now();
                 try {
+                    // Fetch username for UX
+                    let uname;
+                    try {
+                        let u = await client.users.fetch(stickyRec.setBy);
+                        uname = u.username;
+                    } catch { uname = stickyRec.setBy; }
                     let m = await msg.channel.send({
-                        content: `__**Sticky Message**__\n${stickyRec.message}\n*(set by <@${stickyRec.setBy}>)*`,
+                        content: `__**Sticky Message**__\n${stickyRec.message}\n*(set by ${uname})*`,
                         allowedMentions: { parse: [] }
                     });
                     setTimeout(()=> m.delete().catch(()=>{}), 60000*6); // autodelete in 6 min
@@ -2050,6 +2084,7 @@ client.on('messageCreate', async msg => {
 
         }
     }
+
 
     // Prevent issues with .mentions missing or client.user missing
     if (msg.guild && msg.mentions?.has?.(client.user) && msg.content.length < 80) {
