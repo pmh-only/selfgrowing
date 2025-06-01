@@ -1,6 +1,7 @@
 {
-  "name": "discordjs-singlefile-bot",
+  "name": "discord-advanced-singlefilebot",
   "version": "1.0.0",
+  "description": "A large-scale Discord bot in a single file using discord.js, sqlite, and other utilities.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -8,11 +9,13 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
+    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7",
     "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "author": "",
+  "license": "MIT"
 }

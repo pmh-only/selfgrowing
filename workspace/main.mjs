@@ -293,8 +293,10 @@ const client = new Client({
     partials: [
         Partials.Channel,
         Partials.Message
-    ]
+    ],
+    allowedMentions: { parse: [] } // disables all mentions at client construction/Layer
 });
+
 
 // --- Login ---
 await client.login(TOKEN);
@@ -2206,22 +2208,51 @@ return;
     // --- SLASH: LEADERBOARD ---
 
     if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
-        const rows = await db.all('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT 10');
-        // Get user tags from user_tags table for display
-        let userTags = {};
-        try {
-            for (let row of rows) {
-                let tagRec = await db.get('SELECT tag FROM user_tags WHERE userId=?', row.userId);
-                userTags[row.userId] = tagRec && tagRec.tag ? tagRec.tag : row.userId;
+        const lines = [];
+        const xpRows = await db.all('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT 10');
+        let totalMsgs = await db.get('SELECT COUNT(*) as n FROM message_logs');
+        let topMsgRows = await db.all(`
+            SELECT userId, COUNT(*) as msgcount
+            FROM message_logs
+            GROUP BY userId
+            ORDER BY msgcount DESC
+            LIMIT 5
+        `);
+        if (!xpRows.length) return void interaction.reply({content:"Leaderboard empty.",ephemeral:true, allowedMentions: { parse: [] }});
+        lines.push("**__XP & Level Top 10__**");
+        for (let i=0;i<xpRows.length;++i) {
+            const r = xpRows[i];
+            let tagRec;
+            try {
+                tagRec = await db.get('SELECT tag FROM user_tags WHERE userId=?', r.userId);
+            } catch {}
+            let username = tagRec && tagRec.tag ? tagRec.tag : r.userId;
+            lines.push(`**#${i+1}: ${username}** — Level ${r.level} (${r.xp} XP)`);
+        }
+        if (topMsgRows && topMsgRows.length) {
+            lines.push("\n__Top Active Chatters:__");
+            for (let i=0; i<topMsgRows.length; ++i) {
+                let user;
+                try {
+                    let fres = await client.users.fetch(topMsgRows[i].userId);
+                    user = fres?.username || topMsgRows[i].userId;
+                } catch { user = topMsgRows[i].userId; }
+                lines.push(`#${i+1}: ${user} — ${topMsgRows[i].msgcount} msgs`);
             }
-        } catch {}
-        if (!rows.length) return void interaction.reply({content:"Leaderboard empty.",ephemeral:true, allowedMentions: { parse: [] }});
-
-        let msg = rows.map((r,i)=>`**#${i+1}: <@${r.userId}> (${userTags[r.userId] || r.userId}) — Level ${r.level} (${r.xp} XP)**`).join('\n');
-        await interaction.reply({content:msg,ephemeral:false, allowedMentions: { parse: [] }});
-
+        }
+        lines.push(`\n_Total messages logged_: **${totalMsgs?.n||0}**`);
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("Leaderboard & Top Active Users")
+                    .setDescription(lines.join("\n"))
+                    .setColor(0xbafcfa)
+            ],
+            allowedMentions: { parse: [] }
+        });
         return;
     }
+
 
 
 
