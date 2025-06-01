@@ -211,6 +211,19 @@ await db.run(`CREATE TABLE IF NOT EXISTS todo_entries (
     ts INTEGER
 )`);
 
+// [FEATURE] Create feedback table on startup if it doesn't exist.
+await db.run(`CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY,
+    userId TEXT NOT NULL,
+    username TEXT NOT NULL,
+    text TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    upvotes INTEGER NOT NULL DEFAULT 0,
+    downvotes INTEGER NOT NULL DEFAULT 0,
+    voters TEXT NOT NULL DEFAULT '[]'
+)`);
+
+
 await db.run(`CREATE TABLE IF NOT EXISTS timers (
     id INTEGER PRIMARY KEY,
     userId TEXT NOT NULL,
@@ -332,6 +345,7 @@ const contextCommands = [
 
 
 // --- Slash commands registration ---
+// [FEATURE] Add /feedback and /feedbacklist slash commands for public feedback board.
     const commands = [
         // ... previous commands ...
         {
@@ -380,6 +394,24 @@ const contextCommands = [
                 }
             ]
         },
+        // --- NEW FEATURE: FEEDBACK BOARD ---
+        {
+            name: 'feedback',
+            description: "Post public feedback for bot/server (public board, upvote/downvote)",
+            options: [
+                {
+                    name: 'text',
+                    type: 3,
+                    description: 'Your feedback (bugs, praise, suggestions, etc)',
+                    required: true
+                }
+            ]
+        },
+        {
+            name: 'feedbacklist',
+            description: 'Show recent public feedback board for the community'
+        },
+
 
 
 
@@ -727,6 +759,103 @@ const eightBallResponses = [
  * Also: fix interaction.channel.type undefined bug for system/app_home/other types. DMs are type === 1 or interaction.channel is null (DM), text/guild channels differ.
  */
 client.on('interactionCreate', async interaction => {
+    // --- [FEATURE] FEEDBACK BOARD ---
+    if (interaction.isChatInputCommand && interaction.commandName === "feedback") {
+        // Post public feedback (anyone can submit, upvote/downvote)
+        let fbText = interaction.options.getString("text")?.trim();
+        if (!fbText || fbText.length < 4) {
+            await interaction.reply({content: "Feedback too short. Please give a longer comment!", allowedMentions: { parse: [] }});
+            return;
+        }
+        if (fbText.length > 500) fbText = fbText.slice(0,500);
+        let uname;
+        try {
+            let u = await client.users.fetch(interaction.user.id);
+            uname = u.username;
+        } catch { uname = interaction.user.id; }
+        await db.run("INSERT INTO feedback(userId, username, text, createdAt, voters) VALUES (?,?,?,?,?)",
+            interaction.user.id, uname || interaction.user.id, fbText, Date.now(), JSON.stringify([]));
+        const lastId = (await db.get("SELECT id FROM feedback ORDER BY id DESC LIMIT 1"))?.id;
+        const embed = new EmbedBuilder()
+            .setTitle("🗣️ New Public Feedback")
+            .setDescription(`"${fbText}"\n\nBy: ${uname}`)
+            .setFooter({ text: `Community voting welcome!` })
+            .setColor(0x3498db)
+            .setTimestamp();
+        // Buttons for upvote/downvote
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`fb_up_${lastId}`).setLabel("👍 Upvote").setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`fb_down_${lastId}`).setLabel("👎 Downvote").setStyle(ButtonStyle.Danger)
+        );
+        await interaction.reply({
+            embeds: [embed],
+            components: [row],
+            allowedMentions: { parse: [] }
+        });
+        return;
+    }
+
+    if (interaction.isChatInputCommand && interaction.commandName === "feedbacklist") {
+        // Show most recent 6 feedback entries, highest voted first
+        let recs = await db.all(
+            `SELECT * FROM feedback ORDER BY upvotes - downvotes DESC, upvotes DESC, createdAt DESC LIMIT 6`
+        );
+        if (!recs.length) {
+            await interaction.reply({content: "No feedback posted yet! Use `/feedback` to add your own.", allowedMentions: { parse: [] }});
+            return;
+        }
+        let embeds = recs.map((r) => {
+            return new EmbedBuilder()
+                .setTitle(`Feedback #${r.id}`)
+                .setDescription(`"${r.text}"`)
+                .addFields({ name: "By", value: r.username, inline: true },
+                           { name: "👍 Upvotes", value: `${r.upvotes}`, inline: true },
+                           { name: "👎 Downvotes", value: `${r.downvotes}`, inline: true })
+                .setFooter({ text: `ID: ${r.id} | Use /feedback to post your own!` })
+                .setColor(0xeeeeee)
+                .setTimestamp(r.createdAt);
+        });
+        await interaction.reply({embeds: embeds, allowedMentions: { parse: [] }});
+        return;
+    }
+
+    // --- FEEDBACK BOARD BUTTONS ---
+    if (interaction.isButton() && (/^fb_(up|down)_\d+$/.test(interaction.customId))) {
+        const [_, type, id] = interaction.customId.split("_");
+        const fid = Number(id);
+        let row = await db.get("SELECT * FROM feedback WHERE id=?", fid);
+        if (!row)
+            return void interaction.reply({ content: "That feedback entry doesn't exist!", allowedMentions: { parse: [] } });
+
+        let voters = [];
+        try { voters = JSON.parse(row.voters || "[]"); } catch { voters = []; }
+        if (voters.includes(interaction.user.id)) {
+            await interaction.reply({ content: "You already voted on this feedback.", allowedMentions: { parse: [] } });
+            return;
+        }
+        voters.push(interaction.user.id);
+
+        let newUp = row.upvotes, newDn = row.downvotes;
+        if (type === "up") newUp++;
+        else if (type === "down") newDn++;
+
+        await db.run(`UPDATE feedback SET upvotes=?, downvotes=?, voters=? WHERE id=?`,
+            newUp, newDn, JSON.stringify(voters), fid);
+
+        let embed = new EmbedBuilder()
+            .setTitle(`🗣️ Feedback #${fid}`)
+            .setDescription(row.text)
+            .addFields({ name: "By", value: row.username, inline: true },
+                       { name: "👍 Upvotes", value: `${newUp}`, inline: true },
+                       { name: "👎 Downvotes", value: `${newDn}`, inline: true })
+            .setTimestamp(row.createdAt)
+            .setFooter({ text: `Thank you for voting!` })
+            .setColor(0x13c5bb);
+
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
+    
     // --- SLASH: UPVOTES ---
     if (interaction.isChatInputCommand && interaction.commandName === "upvotes") {
         // Top upvoted messages as public leaderboard
@@ -802,6 +931,7 @@ client.on('interactionCreate', async interaction => {
     
     
     // XP LEADERBOARD BUTTON
+
     if (interaction.isButton() && interaction.customId === "xp_leaderboard") {
         // Respond with leaderboard of top 10 in embed, using username, no mention
         try {

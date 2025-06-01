@@ -1,19 +1,16 @@
 {
-  "name": "discord-largebot",
+  "name": "discord-bot",
   "version": "1.0.0",
+  "description": "Large-scale private Discord.js bot with public user commands and data, featuring persistent /data directory and sqlite",
   "type": "module",
-  "description": "A large scale Discord bot with polls, games, mod tools, and productivity features.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6",
     "humanize-duration": "^3.29.0"
   }
 }
