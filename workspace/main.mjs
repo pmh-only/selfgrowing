@@ -578,6 +578,15 @@ const contextCommands = [
             ]}
         ]
     },
+    // [NEW FEATURE ADD] CALC COMMAND REGISTRATION
+    {
+        name: "calc",
+        description: "Calculate simple math expressions. Example: 2+2*(3^2)",
+        options: [
+            { name: "expression", type: 3, description: "Math expression (e.g. 55*3+2)", required: true }
+        ]
+    },
+
     {
         name: "dicewar",
         description: "Start a quick Dice War game: two players each roll a die, higher wins. Use `/dicewar @user`",

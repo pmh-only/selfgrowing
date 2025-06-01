@@ -1,6 +1,7 @@
 {
-  "name": "discord-largebot",
+  "name": "discord-bot",
   "version": "1.0.0",
+  "description": "Large scale Discord.js bot (Esm, SQLite, FS persistent, public user tools/games/moderation)",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -8,9 +9,9 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.30.0"
+    "sqlite": "^5.1.1",
+    "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
