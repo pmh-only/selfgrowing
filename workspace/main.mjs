@@ -681,6 +681,80 @@ const eightBallResponses = [
  * Also: fix interaction.channel.type undefined bug for system/app_home/other types. DMs are type === 1 or interaction.channel is null (DM), text/guild channels differ.
  */
 client.on('interactionCreate', async interaction => {
+    // --- SLASH: UPVOTES ---
+    if (interaction.isChatInputCommand && interaction.commandName === "upvotes") {
+        // Top upvoted messages as public leaderboard
+        let votes = [];
+        try {
+            votes = await db.all(`
+                SELECT messageId, COUNT(*) as votes
+                FROM reactions
+                WHERE reaction='👍'
+                GROUP BY messageId
+                ORDER BY votes DESC
+                LIMIT 5
+            `, []);
+        } catch {}
+        if (!votes || !votes.length) {
+            await interaction.reply({content: `No upvoted messages yet!`});
+            return;
+        }
+        let embed = new EmbedBuilder()
+            .setTitle("🌟 Top Upvoted Messages")
+            .setDescription("The most 'Thumbs Up' messages in this channel.");
+        let lines = [];
+        for (let row of votes) {
+            try {
+                let chan = await client.channels.fetch(CHANNEL_ID);
+                let msg = await chan.messages.fetch(row.messageId);
+                let jumplink = msg.url ? `[jump](${msg.url})` : "";
+                lines.push(`> "${msg.content.slice(0,60)}" — **${row.votes} 👍** ${jumplink}`);
+            } catch {
+                lines.push(`(Message deleted) — **${row.votes} 👍**`);
+            }
+        }
+        embed.setDescription(lines.join("\n") || `No upvoted messages found.`);
+        await interaction.reply({embeds:[embed]});
+        return;
+    }
+    // --- SLASH: DOWNVOTES ---
+    if (interaction.isChatInputCommand && interaction.commandName === "downvotes") {
+        // Top downvoted messages
+        let votes = [];
+        try {
+            votes = await db.all(`
+                SELECT messageId, COUNT(*) as votes
+                FROM reactions
+                WHERE reaction='👎'
+                GROUP BY messageId
+                ORDER BY votes DESC
+                LIMIT 5
+            `, []);
+        } catch {}
+        if (!votes || !votes.length) {
+            await interaction.reply({content: `No downvoted messages yet!`});
+            return;
+        }
+        let embed = new EmbedBuilder()
+            .setTitle("💢 Most Downvoted Messages")
+            .setDescription("The most 'Thumbs Down' messages in this channel.");
+        let lines = [];
+        for (let row of votes) {
+            try {
+                let chan = await client.channels.fetch(CHANNEL_ID);
+                let msg = await chan.messages.fetch(row.messageId);
+                let jumplink = msg.url ? `[jump](${msg.url})` : "";
+                lines.push(`> "${msg.content.slice(0,60)}" — **${row.votes} 👎** ${jumplink}`);
+            } catch {
+                lines.push(`(Message deleted) — **${row.votes} 👎**`);
+            }
+        }
+        embed.setDescription(lines.join("\n") || `No downvoted messages found.`);
+        await interaction.reply({embeds:[embed]});
+        return;
+    }
+    
+
     // --- FEATURE: /ANNOUNCE ---
     if (interaction.isChatInputCommand() && interaction.commandName === "announce") {
         const msgTxt = interaction.options.getString("message").slice(0,800);
