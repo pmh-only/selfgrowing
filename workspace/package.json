@@ -1,8 +1,8 @@
 {
-  "name": "discordjs-large-bot",
+  "name": "discord-productivity-bot",
   "version": "1.0.0",
+  "description": "A large-scale productivity and fun Discord bot for single-channel, private use with advanced features, using discord.js v14, sqlite, and public user data.",
   "type": "module",
-  "description": "A large-scale Discord.js bot with advanced features and persistent storage",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"

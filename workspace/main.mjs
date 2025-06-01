@@ -714,7 +714,7 @@ client.on('interactionCreate', async interaction => {
             `, []);
         } catch {}
         if (!votes || !votes.length) {
-            await interaction.reply({content: `No downvoted messages yet!`});
+            await interaction.reply({content: `No downvoted messages yet!`, allowedMentions: { parse: [] }});
             return;
         }
         let embed = new EmbedBuilder()
@@ -732,9 +732,11 @@ client.on('interactionCreate', async interaction => {
             }
         }
         embed.setDescription(lines.join("\n") || `No downvoted messages found.`);
-        await interaction.reply({embeds:[embed]});
+        await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
         return;
     }
+    
+
     
 
     // --- NEW FEATURE: /pinrandom: Pin a random message as quote (admin/fun tool) ---
