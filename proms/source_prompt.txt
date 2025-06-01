@@ -69,6 +69,7 @@ Your SEARCH/REPLACE blocks string must be formatted as follows:
 4. Each ORIGINAL text must be DISJOINT from all other ORIGINAL text.
 5. This field is a STRING (not an array).
 6. OUTPUT only this string (do not use code block and explanation, confirmation message)
+7. write ORIGINAL text at least 5 lines long.
 
 Current content of main.mjs is
 
