@@ -1,21 +1,18 @@
 {
-  "name": "discordjs-singlefile-bot",
+  "name": "discord-singlefile-bot",
   "version": "1.0.0",
   "type": "module",
-  "description": "Large scale Discord.js bot with single main.mjs entry",
   "main": "main.mjs",
-  "scripts": {
-    "start": "node main.mjs"
-  },
+  "description": "A featureful, single-file Discord bot using discord.js, sqlite, and other utilities.",
+  "author": "ChatGPT",
+  "license": "MIT",
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.13.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
     "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "author": "Your Name",
-  "license": "MIT"
+  }
 }

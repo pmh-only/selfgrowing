@@ -2490,19 +2490,47 @@ client.on('interactionCreate', async interaction => {
         let msg = interaction.targetMessage;
         let reaction = interaction.commandName === "Thumbs Up" ? "👍" : "👎";
         // Only allow one reaction per user per message per type
-        await db.run(`
-            INSERT INTO reactions(messageId, userId, reaction, ts)
-            VALUES (?,?,?,?)
-        `, msg.id, interaction.user.id, reaction, Date.now());
+        try {
+            await db.run(`
+                INSERT INTO reactions(messageId, userId, reaction, ts)
+                VALUES (?,?,?,?)
+            `, msg.id, interaction.user.id, reaction, Date.now());
+        } catch(e) {
+            // likely duplicate key: user already reacted, so update timestamp (allow re-action)
+            await db.run(
+                `UPDATE reactions SET ts=? WHERE messageId=? AND userId=? AND reaction=?`,
+                Date.now(), msg.id, interaction.user.id, reaction
+            );
+        }
         // Count reactions
         let ups = await db.all(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='👍'`, msg.id);
         let downs = await db.all(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='👎'`, msg.id);
-        // Simple aggregate UX
-        await interaction.reply({content: `You reacted to this message with ${reaction}.\nTotal: 👍 ${ups[0].n} | 👎 ${downs[0].n}`});
+        // New UX: show top reactors for this message with mentions, and add a "Leaderboard" button
+        let upReactors = await db.all(
+            `SELECT userId FROM reactions WHERE messageId=? AND reaction='👍' ORDER BY ts DESC LIMIT 3`,
+            msg.id
+        );
+        let downReactors = await db.all(
+            `SELECT userId FROM reactions WHERE messageId=? AND reaction='👎' ORDER BY ts DESC LIMIT 3`,
+            msg.id
+        );
+        let upStr = upReactors.length ? upReactors.map(u=>`<@${u.userId}>`).join(', ') : "None";
+        let downStr = downReactors.length ? downReactors.map(u=>`<@${u.userId}>`).join(', ') : "None";
+        // Show button to leaderboard for UX!
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('roll_leaderboard').setLabel("Dice Leaderboard").setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('upvote_leaderboard').setLabel("Upvote Leaderboard").setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('downvote_leaderboard').setLabel("Downvote Leaderboard").setStyle(ButtonStyle.Danger)
+        );
+        await interaction.reply({
+            content: `You reacted to this message with ${reaction}.\nTotal: 👍 ${ups[0].n} (recent: ${upStr}) | 👎 ${downs[0].n} (recent: ${downStr})`,
+            components: [row]
+        });
         // Add actual unicode reaction for quick visual feedback
         try { await msg.react(reaction); } catch {}
         return;
     }
+
 
     // Suggestion voting feature
     if (interaction.isButton() && (/^suggest_(up|down)vote_/).test(interaction.customId)) {
@@ -2527,7 +2555,47 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({content: `Thank you for your ${type === 'up' ? '👍 upvote' : '👎 downvote'}!`});
         return;
     }
+
+    // NEW FEATURE: Upvote/Downvote Leaderboard via message context menu button
+    if (interaction.isButton() && (interaction.customId === "upvote_leaderboard" || interaction.customId === "downvote_leaderboard")) {
+        // Top upvotes or downvotes as public leaderboard
+        let isUp = interaction.customId === "upvote_leaderboard";
+        let reactionStr = isUp ? "👍" : "👎";
+        let votes = [];
+        try {
+            votes = await db.all(`
+                SELECT messageId, COUNT(*) as votes
+                FROM reactions
+                WHERE reaction=?
+                GROUP BY messageId
+                ORDER BY votes DESC
+                LIMIT 5
+            `, [reactionStr]);
+        } catch {}
+        if (!votes || !votes.length) {
+            await interaction.reply({content: `No ${isUp ? "upvoted" : "downvoted"} messages yet!`});
+            return;
+        }
+        let embed = new EmbedBuilder()
+            .setTitle(isUp ? "🌟 Top Upvoted Messages" : "💢 Most Downvoted Messages")
+            .setDescription(isUp ? "The most 'Thumbs Up' messages in this channel." : "Ouch! The most 'Thumbs Down' messages in this channel.");
+        let lines = [];
+        for (let row of votes) {
+            try {
+                let chan = await client.channels.fetch(CHANNEL_ID);
+                let msg = await chan.messages.fetch(row.messageId);
+                let jumplink = msg.url ? `[jump](${msg.url})` : "";
+                lines.push(`> "${msg.content.slice(0,60)}" — **${row.votes} ${reactionStr}** ${jumplink}`);
+            } catch {
+                lines.push(`(Message deleted) — **${row.votes} ${reactionStr}**`);
+            }
+        }
+        embed.setDescription(lines.join("\n") || `No ${isUp ? "upvoted" : "downvoted"} messages found.`);
+        await interaction.reply({embeds:[embed]});
+        return;
+    }
 });
+
 
 
 
