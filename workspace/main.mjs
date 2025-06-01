@@ -407,19 +407,6 @@ const contextCommands = [
             name: 'rps-stats',
             description: 'Show Rock Paper Scissors leaderboard & stats'
         },
-        // --- ADDITIONAL FEATURE: CALCULATOR COMMAND ---
-        {
-            name: 'calc',
-            description: "Calculate simple math expressions, e.g. 1+2*5.",
-            options: [
-                {
-                    name: 'expression',
-                    type: 3,
-                    description: 'Enter your math expression (e.g. 2+2*3/4)',
-                    required: true
-                }
-            ]
-        },
         // --- NEW FEATURE: FEEDBACK BOARD ---
         {
             name: 'feedback',
@@ -2515,6 +2502,17 @@ return;
         await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
         return;
     }
+
+
+
+
+
+
+
+
+
+
+
     // --- SLASH: DICE WAR LEADERBOARD ---
     if (interaction.isChatInputCommand() && interaction.commandName === "dicewarleaderboard") {
         let score = await readJSONFile("dicewar_leader.json", []);
