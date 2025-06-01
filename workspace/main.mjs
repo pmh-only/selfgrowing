@@ -84,7 +84,7 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-    // --- SLASH: REPORTS (view all public reports) ---
+// --- SLASH: REPORTS (view all public reports) ---
     if (interaction.isChatInputCommand && interaction.commandName === "reports") {
         // Anyone can view recent public reports
         let reports = [];
@@ -113,6 +113,39 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed], components: actionRow ? [actionRow] : [], allowedMentions: { parse: [] } });
         return;
     }
+
+
+// --- ADD: MODERATION FEATURE - /warns (Public warning history summary) ---
+    if (interaction.isChatInputCommand && interaction.commandName === "warns") {
+        // Show all warnings in the server (last 10, public, usernames only)
+        let warnings = [];
+        try { warnings = await db.all('SELECT userId, reason, timestamp FROM warnings ORDER BY timestamp DESC LIMIT 10'); } catch {}
+        if (!warnings.length) {
+            await interaction.reply({ content: "No warnings issued yet!", allowedMentions: { parse: [] } });
+            return;
+        }
+        const userNameMap = {};
+        for (const w of warnings) {
+            try {
+                let u = await client.users.fetch(w.userId);
+                userNameMap[w.userId] = u.username;
+            } catch {
+                userNameMap[w.userId] = w.userId;
+            }
+        }
+        let embed = new EmbedBuilder()
+            .setTitle("⚠️ Recent User Warnings")
+            .setDescription(warnings.map((w, i) =>
+                `**[${i+1}]** User: ${userNameMap[w.userId]}\nReason: ${w.reason}\nAt: <t:${Math.floor(w.timestamp/1000)}:f>`
+            ).join("\n\n"))
+            .setColor(0xffc34d)
+            .setFooter({ text: "All warnings are public for transparency." });
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
+
+
+
 
 
 

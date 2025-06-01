@@ -1,17 +1,22 @@
 {
   "name": "discordjs-largebot",
   "version": "1.0.0",
+  "description": "A large scale Discord bot with SQLite, public UX and no mention policy.",
   "type": "module",
-  "description": "A large-scale Discord.js v14 bot with SQLite and advanced features",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.7",
     "sqlite": "^5.1.1",
-    "node-fetch": "^3.3.2",
-    "humanize-duration": "^3.29.0"
-  }
+    "sqlite3": "^5.1.6",
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "YourName",
+  "license": "MIT"
 }
