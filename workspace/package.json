@@ -1,20 +1,22 @@
 {
-  "name": "discord-private-bot",
+  "name": "large-scale-discord-bot",
   "version": "1.0.0",
+  "description": "A large scale Discord bot using discord.js, sqlite, and advanced features.",
   "type": "module",
   "main": "main.mjs",
-  "description": "A feature-rich private Discord bot with public user tools, SQLite storage, and slash command UX.",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.30.0",
-    "node-fetch": "^3.3.2"
+    "sqlite": "^5.1.1",
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^2.6.12"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "author": "",
+  "license": "MIT"
 }

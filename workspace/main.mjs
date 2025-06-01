@@ -694,10 +694,20 @@ const contextCommands = [
     },
 
 
+    // --- ADDITIONAL FEATURE: MESSAGE PINNER SLASH COMMAND REGISTRATION ---
+    {
+        name: "pin",
+        description: "Pin any message in the channel by message ID (fun archive & easy lookup).",
+        options: [
+            { name: "message_id", type: 3, description: "Message ID to pin", required: true },
+            { name: "note", type: 3, description: "Optional description/note to attach", required: false }
+        ]
+    },
     {
         name: "coinflip",
         description: "Flip a coin for heads or tails!"
     },
+
     {
         name: "suggest",
         description: "Suggest a feature or idea for this server",
@@ -783,6 +793,18 @@ async function readJSONFile(filename, fallback = []) {
 async function saveJSONFile(filename, data) {
     await fs.writeFile(DATA_DIR + filename, JSON.stringify(data, null, 2));
 }
+
+// --- ADDITIONAL FEATURE: MESSAGE PINNER TABLE SETUP ---
+try {
+    await db.run(`CREATE TABLE IF NOT EXISTS pinned_messages (
+        id INTEGER PRIMARY KEY,
+        messageId TEXT NOT NULL,
+        pinnerId TEXT NOT NULL,
+        note TEXT,
+        pinnedAt INTEGER NOT NULL
+    )`);
+} catch {}
+
 
 // ------- Poll emoji array (unicode to maximize accessibility) --------
 const pollEmojis = [
@@ -1718,6 +1740,102 @@ return;
         }
         return;
     }
+
+    // --- ADDITIONAL FEATURE: PIN MESSAGE IN CHANNEL ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "pin") {
+        // Only allow in main channel
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({content: "Use this command in the main channel only.", allowedMentions: { parse: [] }});
+            return;
+        }
+        let msgId = interaction.options.getString("message_id");
+        let note = interaction.options.getString("note") || "";
+        if (!msgId) {
+            await interaction.reply({content: "You must provide a message ID.", allowedMentions: { parse: [] }});
+            return;
+        }
+        // Try to fetch the message and pin it
+        try {
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            const msg = await chan.messages.fetch(msgId);
+            await db.run(
+                'INSERT INTO pinned_messages(messageId, pinnerId, note, pinnedAt) VALUES (?,?,?,?)',
+                msgId, interaction.user.id, note, Date.now()
+            );
+            // Success UX: Provide confirmation with content snippet
+            let snippet = (msg.content || '').slice(0, 120);
+            let uname;
+            try {
+                let userObj = await client.users.fetch(interaction.user.id);
+                uname = userObj.username;
+            } catch { uname = interaction.user.id; }
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle(`📌 Message pinned successfully!`)
+                        .setDescription([
+                            `**Content:**\n${snippet ? `> ${snippet}` : "*[no content/attachment]*"}`,
+                            note ? `**Note:** ${note}` : "",
+                            `Pinned by: ${uname}`
+                        ].filter(Boolean).join("\n"))
+                        .setFooter({ text: `Message ID: ${msgId} | Use /pinned to see all.` })
+                        .setURL(msg.url || undefined)
+                        .setColor(0xfbb034)
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({content: "Could not pin the message. Check the message ID.", allowedMentions: { parse: [] }});
+        }
+        return;
+    }
+
+    // --- ADDITIONAL FEATURE: VIEW PINNED MESSAGES SLASH COMMAND ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "pinned") {
+        // List last 10 pins, show in embed, with IDs and jump links where possible
+        try {
+            let pins = await db.all("SELECT * FROM pinned_messages ORDER BY pinnedAt DESC LIMIT 10");
+            if (!pins || pins.length === 0) {
+                await interaction.reply({content: "No messages pinned yet! Pin one using `/pin`.", allowedMentions: { parse: [] }});
+                return;
+            }
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            let desc = "";
+            for (let i = 0; i < pins.length; ++i) {
+                let pi = pins[i];
+                let uname;
+                try {
+                    let user = await client.users.fetch(pi.pinnerId);
+                    uname = user.username;
+                } catch { uname = pi.pinnerId; }
+                let msgContent = "";
+                let jumplink = "";
+                try {
+                    let m = await chan.messages.fetch(pi.messageId);
+                    msgContent = m.content ? m.content.slice(0,80) : "*[no content/attachment]*";
+                    jumplink = m.url ? `[jump](${m.url})` : "";
+                } catch {
+                    msgContent = "*[deleted/unavailable]*";
+                }
+                desc += `**[${i + 1}]** ${uname} pinned: "${msgContent}" ${jumplink}`;
+                if (pi.note) desc += `\nNote: ${pi.note}`;
+                desc += "\n";
+            }
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("📌 Pinned Messages in this Channel")
+                        .setDescription(desc)
+                        .setColor(0xfbb034)
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({content:"Failed to show pinned messages.", allowedMentions: { parse: [] }});
+        }
+        return;
+    }
+
 
 
 
