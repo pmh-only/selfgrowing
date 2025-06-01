@@ -1,217 +1,6 @@
 // main.mjs
 
-import { Client, GatewayIntentBits, Partials, REST, Routes, InteractionType, PermissionFlagsBits, MessageType, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle }
-
-    // --- SLASH: REPORT ---
-    if (interaction.isChatInputCommand && interaction.commandName === "report") {
-        // UX Restriction: Only allow in main channel, public report log, no mentions.
-        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
-            await interaction.reply({ content: "Reports must be made in the main public channel. Use the command there!", allowedMentions: { parse: [] }});
-            return;
-        }
-        const messageId = interaction.options.getString("message_id");
-        const reason = interaction.options.getString("reason");
-        try {
-            const chan = await client.channels.fetch(CHANNEL_ID);
-            let msg;
-            try {
-                msg = await chan.messages.fetch(messageId);
-            } catch {
-                // Still allow reporting to log even if deleted
-                msg = null;
-            }
-            // Prepare a report log entry for moderation (store in /data/reports.json), public viewing
-            let reports = [];
-            try { reports = await readJSONFile("reports.json", []); } catch {}
-            const reportObj = {
-                reporterId: interaction.user.id,
-                reporterName: interaction.user.username,
-                messageId: messageId,
-                reportedContent: msg ? msg.content : "[Deleted/unavailable]",
-                reportedAuthorId: msg ? msg.author.id : null,
-                reportedAuthorName: msg ? msg.author.username : null,
-                reason: reason,
-                reportedAt: Date.now()
-            };
-            reports.push(reportObj);
-            // Only keep latest 50 reports.
-            if (reports.length > 50) reports = reports.slice(-50);
-            await saveJSONFile("reports.json", reports);
-            await interaction.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle("🚩 Message Reported")
-                        .setDescription(`Message ${msg ? `from "${msg.author.username}"` : `[unavailable]`} has been reported.`)
-                        .addFields(
-                            { name: "Reason", value: reason },
-                            { name: "Message ID", value: messageId },
-                            { name: "Reporter", value: interaction.user.username }
-                        )
-                        .setFooter({ text: "All reports are public and logged in /reports" })
-                        .setColor(0xff3b3b)
-                        .setTimestamp()
-                ],
-                allowedMentions: { parse: [] }
-            });
-        } catch (e) {
-            await interaction.reply({ content: "Failed to report the message. Make sure the ID is correct!", allowedMentions: { parse: [] } });
-        }
-        return;
-    }
-
-// === [ FEATURE: REPORT DELETE BUTTON HANDLER & WARNING DELETE BUTTON HANDLER ] ===
-client.on('interactionCreate', async interaction => {
-    // --- Report delete via number index or messageId ---
-    if (interaction.isButton() && (
-        interaction.customId.startsWith('delete_report_') ||
-        interaction.customId.startsWith('delete_report_num_')
-    )) {
-        let reports = [];
-        try { reports = await readJSONFile("reports.json", []); } catch {}
-        let idx = -1;
-        if (interaction.customId.startsWith('delete_report_num_')) {
-            // Button: delete by display index (as seen in UI): count back from end
-            let displayIdx = parseInt(interaction.customId.slice('delete_report_num_'.length), 10); // 1-based idx
-            if (isNaN(displayIdx) || displayIdx < 1) {
-                await interaction.reply({ content: "Invalid report number!", allowedMentions: { parse: [] }});
-                return;
-            }
-            // Slice last 10, then find corresponding index in reports (since reversed)
-            const last10 = reports.slice(-10);
-            idx = reports.length - last10.length + (last10.length - displayIdx);
-            if (idx < 0 || idx >= reports.length) {
-                await interaction.reply({ content: "Report number not found.", allowedMentions: { parse: [] }});
-                return;
-            }
-        } else if (interaction.customId.startsWith('delete_report_')) {
-            // legacy: delete by messageId (last occurrence)
-            let msgId = interaction.customId.slice('delete_report_'.length);
-            for (let i = reports.length-1; i >= 0; --i) {
-                if (reports[i].messageId === msgId) {
-                    idx = i; break;
-                }
-            }
-            if (idx === -1) {
-                await interaction.reply({ content: "No such report found to delete.", allowedMentions: { parse: [] } });
-                return;
-            }
-        }
-        reports.splice(idx,1);
-        await saveJSONFile("reports.json", reports);
-        await interaction.reply({ content: "Report has been deleted.", allowedMentions: { parse: [] } });
-        return;
-    }
-
-    // --- Warning delete via button ---
-    if (interaction.isButton() && interaction.customId.startsWith('delete_warning_')) {
-        let wid = interaction.customId.slice('delete_warning_'.length);
-        if (!wid) {
-            await interaction.reply({ content: "Invalid warning ID.", allowedMentions: { parse: [] } });
-            return;
-        }
-        try {
-            // Delete directly from warnings table
-            await db.run('DELETE FROM warnings WHERE id=?', wid);
-            await interaction.reply({ content: "Warning has been deleted.", allowedMentions: { parse: [] } });
-        } catch {
-            await interaction.reply({ content: "Failed to delete warning.", allowedMentions: { parse: [] } });
-        }
-        return;
-    }
-});
-
-
-// --- SLASH: REPORTS (view all public reports) ---
-    if (interaction.isChatInputCommand && interaction.commandName === "reports") {
-        // Anyone can view recent public reports; add delete button per report (up to 5 for moderation transparency)
-        let reports = [];
-        try { reports = await readJSONFile("reports.json", []); } catch {}
-        if (!reports.length) {
-            await interaction.reply({ content: "No message reports yet!", allowedMentions: { parse: [] } });
-            return;
-        }
-        // List last 10, newest first; allow delete by # via buttons for up to 5
-        const repRows = reports.slice(-10).reverse().map((r,i)=>({...r, displayIndex: i+1 }));
-        const embed = new EmbedBuilder()
-            .setTitle("🚩 Recent Message Reports")
-            .setDescription(repRows.map(r =>
-                `**[${r.displayIndex}]** Reporter: ${r.reporterName}\nMessage ID: ${r.messageId}` +
-                (r.reportedAuthorName ? `\nAuthor: ${r.reportedAuthorName}` : "") +
-                `\nContent: ${r.reportedContent.slice(0,80)}\nReason: ${r.reason}\nAt: <t:${Math.floor(r.reportedAt/1000)}:f>`
-            ).join('\n\n'))
-            .setColor(0xffbdbd)
-            .setFooter({ text: "Reports are public, for transparency." });
-        const actionRow = new ActionRowBuilder().addComponents(
-            repRows.slice(0,5).map(r =>
-                new ButtonBuilder().setCustomId('delete_report_num_' + r.displayIndex).setLabel(`Delete #${r.displayIndex}`).setStyle(ButtonStyle.Danger)
-            )
-        );
-        await interaction.reply({ embeds: [embed], components: repRows.length ? [actionRow] : [], allowedMentions: { parse: [] } });
-        return;
-    }
-
-
-
-
-// --- ADD: MODERATION FEATURE - /warns (Public warning history summary) ---
-    if (interaction.isChatInputCommand && interaction.commandName === "warns") {
-        // Show all warnings in the server (last 10, public, usernames only) + allow delete by number (admin/all)
-        let warnings = [];
-        try { warnings = await db.all('SELECT id, userId, reason, timestamp FROM warnings ORDER BY timestamp DESC LIMIT 10'); } catch {}
-        if (!warnings.length) {
-            await interaction.reply({ content: "No warnings issued yet!", allowedMentions: { parse: [] } });
-            return;
-        }
-        const userNameMap = {};
-        for (const w of warnings) {
-            try {
-                let u = await client.users.fetch(w.userId);
-                userNameMap[w.userId] = u.username;
-            } catch {
-                userNameMap[w.userId] = w.userId;
-            }
-        }
-        const warnRows = warnings.map((w, i)=> ({
-            ...w,
-            displayIndex: i+1
-        }));
-        let embed = new EmbedBuilder()
-            .setTitle("⚠️ Recent User Warnings")
-            .setDescription(warnRows.map((w) =>
-                `**[${w.displayIndex}]** User: ${userNameMap[w.userId]}\nReason: ${w.reason}\nAt: <t:${Math.floor(w.timestamp/1000)}:f>`
-            ).join("\n\n"))
-            .setColor(0xffc34d)
-            .setFooter({ text: "All warnings are public for transparency." });
-        const actionRow = new ActionRowBuilder().addComponents(
-            warnRows.map(w =>
-                new ButtonBuilder()
-                    .setCustomId(`delete_warning_${w.id}`)
-                    .setLabel(`Delete #${w.displayIndex}`)
-                    .setStyle(ButtonStyle.Danger)
-            ).slice(0,5)
-        );
-        await interaction.reply({
-            embeds: [embed],
-            components: warnRows.length ? [actionRow] : [],
-            allowedMentions: { parse: [] }
-        });
-        return;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- from 'discord.js';
+import { Client, GatewayIntentBits, Partials, REST, Routes, InteractionType, PermissionFlagsBits, MessageType, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import sqlite3 from 'sqlite3';
 import fs from 'fs/promises';
 import { open } from 'sqlite';
@@ -2726,17 +2515,6 @@ return;
         await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
         return;
     }
-
-
-
-
-
-
-
-
-
-
-
     // --- SLASH: DICE WAR LEADERBOARD ---
     if (interaction.isChatInputCommand() && interaction.commandName === "dicewarleaderboard") {
         let score = await readJSONFile("dicewar_leader.json", []);
@@ -3636,9 +3414,6 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-
-
-
     // POLL VOTING BUTTON HANDLING (fix: check for expired/missing poll, UX improvement)
     // POLL VOTING BUTTON HANDLING (fix: check for expired/missing poll, UX improvement)
     if (interaction.isButton() && ((/^vote_(\d)$/).test(interaction.customId) || interaction.customId==="vote_retract")) {
@@ -3859,22 +3634,204 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    
+    // --- SLASH: REPORT ---
+    if (interaction.isChatInputCommand && interaction.commandName === "report") {
+        // UX Restriction: Only allow in main channel, public report log, no mentions.
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({ content: "Reports must be made in the main public channel. Use the command there!", allowedMentions: { parse: [] }});
+            return;
+        }
+        const messageId = interaction.options.getString("message_id");
+        const reason = interaction.options.getString("reason");
+        try {
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            let msg;
+            try {
+                msg = await chan.messages.fetch(messageId);
+            } catch {
+                // Still allow reporting to log even if deleted
+                msg = null;
+            }
+            // Prepare a report log entry for moderation (store in /data/reports.json), public viewing
+            let reports = [];
+            try { reports = await readJSONFile("reports.json", []); } catch {}
+            const reportObj = {
+                reporterId: interaction.user.id,
+                reporterName: interaction.user.username,
+                messageId: messageId,
+                reportedContent: msg ? msg.content : "[Deleted/unavailable]",
+                reportedAuthorId: msg ? msg.author.id : null,
+                reportedAuthorName: msg ? msg.author.username : null,
+                reason: reason,
+                reportedAt: Date.now()
+            };
+            reports.push(reportObj);
+            // Only keep latest 50 reports.
+            if (reports.length > 50) reports = reports.slice(-50);
+            await saveJSONFile("reports.json", reports);
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🚩 Message Reported")
+                        .setDescription(`Message ${msg ? `from "${msg.author.username}"` : `[unavailable]`} has been reported.`)
+                        .addFields(
+                            { name: "Reason", value: reason },
+                            { name: "Message ID", value: messageId },
+                            { name: "Reporter", value: interaction.user.username }
+                        )
+                        .setFooter({ text: "All reports are public and logged in /reports" })
+                        .setColor(0xff3b3b)
+                        .setTimestamp()
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({ content: "Failed to report the message. Make sure the ID is correct!", allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
+// === [ FEATURE: REPORT DELETE BUTTON HANDLER & WARNING DELETE BUTTON HANDLER ] ===
+client.on('interactionCreate', async interaction => {
+    // --- Report delete via number index or messageId ---
+    if (interaction.isButton() && (
+        interaction.customId.startsWith('delete_report_') ||
+        interaction.customId.startsWith('delete_report_num_')
+    )) {
+        let reports = [];
+        try { reports = await readJSONFile("reports.json", []); } catch {}
+        let idx = -1;
+        if (interaction.customId.startsWith('delete_report_num_')) {
+            // Button: delete by display index (as seen in UI): count back from end
+            let displayIdx = parseInt(interaction.customId.slice('delete_report_num_'.length), 10); // 1-based idx
+            if (isNaN(displayIdx) || displayIdx < 1) {
+                await interaction.reply({ content: "Invalid report number!", allowedMentions: { parse: [] }});
+                return;
+            }
+            // Slice last 10, then find corresponding index in reports (since reversed)
+            const last10 = reports.slice(-10);
+            idx = reports.length - last10.length + (last10.length - displayIdx);
+            if (idx < 0 || idx >= reports.length) {
+                await interaction.reply({ content: "Report number not found.", allowedMentions: { parse: [] }});
+                return;
+            }
+        } else if (interaction.customId.startsWith('delete_report_')) {
+            // legacy: delete by messageId (last occurrence)
+            let msgId = interaction.customId.slice('delete_report_'.length);
+            for (let i = reports.length-1; i >= 0; --i) {
+                if (reports[i].messageId === msgId) {
+                    idx = i; break;
+                }
+            }
+            if (idx === -1) {
+                await interaction.reply({ content: "No such report found to delete.", allowedMentions: { parse: [] } });
+                return;
+            }
+        }
+        reports.splice(idx,1);
+        await saveJSONFile("reports.json", reports);
+        await interaction.reply({ content: "Report has been deleted.", allowedMentions: { parse: [] } });
+        return;
+    }
+
+    // --- Warning delete via button ---
+    if (interaction.isButton() && interaction.customId.startsWith('delete_warning_')) {
+        let wid = interaction.customId.slice('delete_warning_'.length);
+        if (!wid) {
+            await interaction.reply({ content: "Invalid warning ID.", allowedMentions: { parse: [] } });
+            return;
+        }
+        try {
+            // Delete directly from warnings table
+            await db.run('DELETE FROM warnings WHERE id=?', wid);
+            await interaction.reply({ content: "Warning has been deleted.", allowedMentions: { parse: [] } });
+        } catch {
+            await interaction.reply({ content: "Failed to delete warning.", allowedMentions: { parse: [] } });
+        }
+        return;
+    }
 });
 
 
+// --- SLASH: REPORTS (view all public reports) ---
+    if (interaction.isChatInputCommand && interaction.commandName === "reports") {
+        // Anyone can view recent public reports; add delete button per report (up to 5 for moderation transparency)
+        let reports = [];
+        try { reports = await readJSONFile("reports.json", []); } catch {}
+        if (!reports.length) {
+            await interaction.reply({ content: "No message reports yet!", allowedMentions: { parse: [] } });
+            return;
+        }
+        // List last 10, newest first; allow delete by # via buttons for up to 5
+        const repRows = reports.slice(-10).reverse().map((r,i)=>({...r, displayIndex: i+1 }));
+        const embed = new EmbedBuilder()
+            .setTitle("🚩 Recent Message Reports")
+            .setDescription(repRows.map(r =>
+                `**[${r.displayIndex}]** Reporter: ${r.reporterName}\nMessage ID: ${r.messageId}` +
+                (r.reportedAuthorName ? `\nAuthor: ${r.reportedAuthorName}` : "") +
+                `\nContent: ${r.reportedContent.slice(0,80)}\nReason: ${r.reason}\nAt: <t:${Math.floor(r.reportedAt/1000)}:f>`
+            ).join('\n\n'))
+            .setColor(0xffbdbd)
+            .setFooter({ text: "Reports are public, for transparency." });
+        const actionRow = new ActionRowBuilder().addComponents(
+            repRows.slice(0,5).map(r =>
+                new ButtonBuilder().setCustomId('delete_report_num_' + r.displayIndex).setLabel(`Delete #${r.displayIndex}`).setStyle(ButtonStyle.Danger)
+            )
+        );
+        await interaction.reply({ embeds: [embed], components: repRows.length ? [actionRow] : [], allowedMentions: { parse: [] } });
+        return;
+    }
 
 
 
 
+// --- ADD: MODERATION FEATURE - /warns (Public warning history summary) ---
+    if (interaction.isChatInputCommand && interaction.commandName === "warns") {
+        // Show all warnings in the server (last 10, public, usernames only) + allow delete by number (admin/all)
+        let warnings = [];
+        try { warnings = await db.all('SELECT id, userId, reason, timestamp FROM warnings ORDER BY timestamp DESC LIMIT 10'); } catch {}
+        if (!warnings.length) {
+            await interaction.reply({ content: "No warnings issued yet!", allowedMentions: { parse: [] } });
+            return;
+        }
+        const userNameMap = {};
+        for (const w of warnings) {
+            try {
+                let u = await client.users.fetch(w.userId);
+                userNameMap[w.userId] = u.username;
+            } catch {
+                userNameMap[w.userId] = w.userId;
+            }
+        }
+        const warnRows = warnings.map((w, i)=> ({
+            ...w,
+            displayIndex: i+1
+        }));
+        let embed = new EmbedBuilder()
+            .setTitle("⚠️ Recent User Warnings")
+            .setDescription(warnRows.map((w) =>
+                `**[${w.displayIndex}]** User: ${userNameMap[w.userId]}\nReason: ${w.reason}\nAt: <t:${Math.floor(w.timestamp/1000)}:f>`
+            ).join("\n\n"))
+            .setColor(0xffc34d)
+            .setFooter({ text: "All warnings are public for transparency." });
+        const actionRow = new ActionRowBuilder().addComponents(
+            warnRows.map(w =>
+                new ButtonBuilder()
+                    .setCustomId(`delete_warning_${w.id}`)
+                    .setLabel(`Delete #${w.displayIndex}`)
+                    .setStyle(ButtonStyle.Danger)
+            ).slice(0,5)
+        );
+        await interaction.reply({
+            embeds: [embed],
+            components: warnRows.length ? [actionRow] : [],
+            allowedMentions: { parse: [] }
+        });
+        return;
+    }
 
-
-
-
-
-
-
-
-
+});
 
 /**
  * Migration: add "handled" column to suggestion if missing (for deployments with pre-existing data)
@@ -3956,12 +3913,6 @@ client.once('ready', async () => {
 
 });
 
-
-
-
-
-
-
 client.on('messageDelete', async msg => {
     // Log which message was deleted for use with /snipe
     if (!msg.partial && msg.guild && msg.channel && msg.channel.id === CHANNEL_ID && !msg.author?.bot) {
@@ -3970,9 +3921,6 @@ client.on('messageDelete', async msg => {
             msg.id, msg.channel.id, msg.guild.id, msg.author.id, msg.content);
     }
 });
-
-
-
 
 let userWelcomeStatus = {};
 
@@ -3994,9 +3942,6 @@ process.on("unhandledRejection", err => {
     if (err && err.stack) console.error("Unhandled Rejection:", err.stack);
     else console.error("Unhandled Rejection:", err);
 });
-
-
-
 
 // Listen for admin command: update blocklist dynamically (moderation tool, slash command)
 
@@ -4065,11 +4010,6 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-
-
-
-
-
 // Get Started button handler for welcome embed (now always in main channel)
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton() || interaction.customId!=='dm_getstarted') return;
@@ -4122,38 +4062,3 @@ client.on('interactionCreate', async interaction => {
         ]
     });
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
