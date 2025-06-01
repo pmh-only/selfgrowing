@@ -402,6 +402,13 @@ const contextCommands = [
             { name: "message_link", type: 3, description: "Message link", required: true }
         ]
     },
+    // --- [NEW FEATURE] Pin a random message from this channel as a quote (fun admin tool) ---
+    {
+        name: "pinrandom",
+        description: "Pick a random message and save as quote (fun admin tool)",
+        default_member_permissions: (PermissionFlagsBits.ManageMessages).toString()
+    },
+
     {
         name: "quotes",
         description: "Show a random saved quote",
@@ -644,6 +651,47 @@ const eightBallResponses = [
  * Also: fix interaction.channel.type undefined bug for system/app_home/other types. DMs are type === 1 or interaction.channel is null (DM), text/guild channels differ.
  */
 client.on('interactionCreate', async interaction => {
+    // --- NEW FEATURE: /pinrandom: Pin a random message as quote (admin/fun tool) ---
+    if (interaction.isChatInputCommand && interaction.commandName === "pinrandom") {
+        // Permissions not required per instructions (works for all for demo), but leave admin role wording in embed.
+        try {
+            // Fetch up to 100 recent (non-bot) messages. Adjust as needed for performance.
+            let chan = await client.channels.fetch(CHANNEL_ID);
+            let msgsRaw = await chan.messages.fetch({ limit: 100 });
+            // Filter out bot/self messages and system messages
+            let msgs = [...msgsRaw.values()].filter(m => !m.author.bot && !m.system && m.content && m.content.trim().length > 2);
+            if (!msgs.length) {
+                await interaction.reply({ content: "No suitable messages found to pin as a quote." });
+                return;
+            }
+            // Pick at random
+            let pick = msgs[Math.floor(Math.random() * msgs.length)];
+            // Save as quote
+            let quotes = await readJSONFile("quotes.json", []);
+            quotes.push({
+                user: {id: pick.author.id, tag: pick.author.tag },
+                content: pick.content,
+                timestamp: pick.createdTimestamp,
+                category: "pinned-random"
+            });
+            await saveJSONFile("quotes.json", quotes);
+            // Visual feedback
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("📌 Random Message Pinned as Quote!")
+                        .setDescription(`"${pick.content}"\n\n— <@${pick.author.id}> (${pick.author.tag})`)
+                        .setFooter({ text: `Picked at random by <@${interaction.user.id}> (Admin tool)` })
+                        .setColor(0xf08080)
+                ]
+            });
+        } catch(e) {
+            await interaction.reply({ content: "Failed to pin a random quote.", allowedMentions: { users: [] } });
+        }
+        return;
+    }
+    
+
     // Only allow the configured channel for everything except DMs & system commands with no channel (edge case: application commands may have .channel undefined)
     if (
         (interaction.channel && interaction.channel.id !== CHANNEL_ID) &&

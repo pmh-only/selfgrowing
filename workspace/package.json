@@ -1,19 +1,15 @@
 {
-  "name": "discordjs-large-bot",
+  "name": "discord-advanced-bot",
   "version": "1.0.0",
   "type": "module",
   "main": "main.mjs",
-  "description": "A private, large-scale Discord.js bot with SQLite and pubic user data.",
   "scripts": {
     "start": "node main.mjs"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
+    "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0"
   }
 }
