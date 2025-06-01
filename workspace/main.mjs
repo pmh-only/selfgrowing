@@ -75,32 +75,7 @@ try {
     db = await open({
         filename: DATA_DIR + 'botdata.db',
         driver: sqlite3.Database
-    // XP LEADERBOARD BUTTON
-    if (interaction.isButton() && interaction.customId === "xp_leaderboard") {
-        // Respond with leaderboard of top 10 in embed, using username, no mention
-        try {
-            const rows = await db.all('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT 10');
-            // Get user tags from user_tags table for display
-            let userTags = {};
-            try {
-                for (let row of rows) {
-                    let tagRec = await db.get('SELECT tag FROM user_tags WHERE userId=?', row.userId);
-                    userTags[row.userId] = tagRec && tagRec.tag ? tagRec.tag : row.userId;
-                }
-            } catch {}
-            if (!rows.length) return void interaction.reply({content:"Leaderboard empty.",ephemeral:true, allowedMentions: { parse: [] }});
-
-            let msg = rows.map((r,i)=>`**#${i+1}: ${userTags[r.userId] || r.userId} — Level ${r.level} (${r.xp} XP)**`).join('\n');
-            await interaction.reply({
-                embeds:[new EmbedBuilder().setTitle("🏅 XP Leaderboard").setDescription(msg).setColor(0xF9D923)],
-                allowedMentions: { parse: [] }
-            });
-        } catch {
-            await interaction.reply({content:"Failed to show XP leaderboard.", allowedMentions: { parse: [] }});
-        }
-        return;
-    }
-});
+    });
 
 } catch (e) {
     console.error("Failed to open SQLite DB!", e);
@@ -802,6 +777,32 @@ client.on('interactionCreate', async interaction => {
         return;
     }
     
+    
+    // XP LEADERBOARD BUTTON
+    if (interaction.isButton() && interaction.customId === "xp_leaderboard") {
+        // Respond with leaderboard of top 10 in embed, using username, no mention
+        try {
+            const rows = await db.all('SELECT userId, xp, level FROM xp ORDER BY level DESC, xp DESC LIMIT 10');
+            // Get user tags from user_tags table for display
+            let userTags = {};
+            try {
+                for (let row of rows) {
+                    let tagRec = await db.get('SELECT tag FROM user_tags WHERE userId=?', row.userId);
+                    userTags[row.userId] = tagRec && tagRec.tag ? tagRec.tag : row.userId;
+                }
+            } catch {}
+            if (!rows.length) return void interaction.reply({content:"Leaderboard empty.",ephemeral:true, allowedMentions: { parse: [] }});
+
+            let msg = rows.map((r,i)=>`**#${i+1}: ${userTags[r.userId] || r.userId} — Level ${r.level} (${r.xp} XP)**`).join('\n');
+            await interaction.reply({
+                embeds:[new EmbedBuilder().setTitle("🏅 XP Leaderboard").setDescription(msg).setColor(0xF9D923)],
+                allowedMentions: { parse: [] }
+            });
+        } catch {
+            await interaction.reply({content:"Failed to show XP leaderboard.", allowedMentions: { parse: [] }});
+        }
+        return;
+    }
 
     
 
