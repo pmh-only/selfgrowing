@@ -1,20 +1,22 @@
 {
-  "name": "discord-bot-large",
+  "name": "discordjs-private-bot",
   "version": "1.0.0",
-  "description": "Large scale Discord bot with feature-rich slash commands, moderation, games, and utilities",
   "type": "module",
   "main": "main.mjs",
+  "description": "A large-scale Discord.js bot with fun, moderation, utility, and public features, designed for a single guild/channel, persistent storage in Docker.",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "5.1.1",
-    "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.29.0",
-    "node-fetch": "^2.6.12"
+    "sqlite3": "^5.1.7",
+    "sqlite": "^5.1.1",
+    "humanize-duration": "^3.35.0",
+    "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "author": "",
+  "license": "UNLICENSED"
 }
