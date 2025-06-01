@@ -1291,9 +1291,10 @@ return;
     if (interaction.isChatInputCommand() && interaction.commandName === 'note') {
         // Restrict all note commands to PUBLIC main channel (fix restriction: DM not allowed)
         if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
-            await interaction.reply({content:"Notes are public, use in the main channel.",ephemeral:false}); return;
+            await interaction.reply({content:"Notes are public, use in the main channel.",ephemeral:false, allowedMentions: { parse: [] }}); return;
         }
         if (interaction.options.getSubcommand() === 'add') {
+
             const txt = interaction.options.getString('content').substring(0, 500);
             await db.run('INSERT INTO notes(userId, note, timestamp) VALUES (?,?,?)',
                 interaction.user.id, txt, Date.now());
@@ -1301,17 +1302,17 @@ return;
 
         } else if (interaction.options.getSubcommand() === 'list') {
             const rows = await db.all('SELECT id, note, timestamp, userId FROM notes ORDER BY id DESC LIMIT 10');
-            if (rows.length === 0) await interaction.reply({content:"No notes yet.", allowedMentions: { parse: [] }});
-
+            if (rows.length === 0) { await interaction.reply({content:"No notes yet.", allowedMentions: { parse: [] }}); }
             else {
                 const embed = new EmbedBuilder()
                   .setTitle("Last 10 Public Notes")
-                  .setDescription(rows.map((r,i) => `**[${rows.length-i}]** <@${r.userId}>: ${r.note} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
+                  .setDescription(rows.map((r,i) => `**[${rows.length-i}]** ${client.users.cache.get(r.userId)?.username || r.userId}: ${r.note} _(at <t:${Math.floor(r.timestamp/1000)}:f>)_`).join("\n"))
                   .setColor(0x80ecec);
                 await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
             }
 
         } else if (interaction.options.getSubcommand() === 'delete') {
+
             const idx = interaction.options.getInteger('number');
             const allRows = await db.all('SELECT id, userId FROM notes ORDER BY id DESC LIMIT 10');
             if (!allRows[idx-1]) return void interaction.reply({content:"Invalid note number!", allowedMentions: { parse: [] }});
@@ -1326,14 +1327,15 @@ return;
         } else if (interaction.options.getSubcommand() === "pinned") {
             const todos = await db.all("SELECT content, done, ts, userId FROM todo_entries ORDER BY ts DESC");
             if (!todos.length)
-                return void interaction.reply({content:"No pinned notes (all pinned notes are now in `/todo list` as the To-Do list, public to all)."});
+                return void interaction.reply({content:"No pinned notes (all pinned notes are now in `/todo list` as the To-Do list, public to all).", allowedMentions: { parse: [] }});
             const embed = new EmbedBuilder()
                 .setTitle("📝 Pinned Notes (Public To-Do List)")
-                .setDescription(todos.slice(0,10).map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** <@${t.userId}>: ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
+                .setDescription(todos.slice(0,10).map((t,i)=>`${t.done?'✅':'❌'} **[${i+1}]** ${client.users.cache.get(t.userId)?.username || t.userId}: ${t.content} _(at <t:${Math.floor(t.ts/1000)}:f>)_`).join("\n"))
                 .setColor(0xfecf6a);
             await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
 
         } else if (interaction.options.getSubcommand() === "search") {
+
             const query = interaction.options.getString("query").toLowerCase();
             const rows = await db.all('SELECT note, timestamp, userId FROM notes ORDER BY id DESC LIMIT 50');
             const matches = rows.filter(r => r.note.toLowerCase().includes(query));
