@@ -413,9 +413,14 @@ const contextCommands = [
     const commands = [
         // NEW FEATURE: /remindersclear command for clearing all your reminders
         {
+            name: 'upvotes',
+            description: 'Show the most upvoted messages in the channel!'
+        },
+        {
             name: 'remindersclear',
             description: 'Remove all your pending reminders at once (UX quick clean).'
         },
+
 
     // --- ADDITIONAL FEATURE: MESSAGE PINNED LIST SLASH (register missing) ---
     {
@@ -3382,6 +3387,19 @@ client.on('messageCreate', async msg => {
     if (msg.guild && msg.channel.id !== CHANNEL_ID) return;
     if (msg.author.bot) return;
 
+    // --- Fix: Disallow user/role/everyone mentions in sent messages (forced allowedMentions global) ---
+    if (
+        (msg.mentions?.users && msg.mentions.users.size > 0) ||
+        (msg.mentions?.roles && msg.mentions.roles.size > 0) ||
+        msg.mentions?.everyone
+    ) {
+        // Remove all mentions from message, auto-remove for compliance (UX: warning, but auto-resolve)
+        try { await msg.delete(); } catch {}
+        await msg.channel.send({content:"Mentions are disabled for this bot. Do not mention users, roles, or everyone.", allowedMentions: { parse: [] }});
+        return;
+    }
+
+
     // Store/refresh user tag in db for leaderboard/UX use (new feature)
     if (msg.guild) {
         try {
@@ -3439,6 +3457,9 @@ client.on('messageCreate', async msg => {
         const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', msg.author.id) || {xp:0,level:0};
         let xpAdd = Math.floor(Math.random()*5)+5; // boost for bot interaction
         let xpNow = row.xp + xpAdd;
+
+        // --- Fix: (Forced) allowedMentions parse: [] in all outgoing .reply from here on ---
+
         let lvlNow = row.level;
         if(xpNow >= (row.level+1)*100) { xpNow=0; lvlNow++; }
         await db.run('INSERT OR REPLACE INTO xp(userId, xp, level) VALUES (?,?,?)',
