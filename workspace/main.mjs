@@ -4946,6 +4946,7 @@ client.on('interactionCreate', async interaction => {
 });
 
 
+
 /**
  * Migration: add "handled" column to suggestion if missing (for deployments with pre-existing data)
  */

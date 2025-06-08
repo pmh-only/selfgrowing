@@ -1,7 +1,7 @@
 {
-  "name": "discord-largebot",
+  "name": "discordjs-largebot",
   "version": "1.0.0",
-  "description": "Large scale, single-file Discord.js bot with admin, moderation, games, and user tools.",
+  "description": "Private full-featured Discord bot with moderation, fun, productivity tools, SQLite persistence.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -9,21 +9,14 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
+    "sqlite3": "^5.1.7",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.4",
-    "node-fetch": "^3.3.2",
-    "humanize-duration": "^3.29.0"
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": [
-    "discord",
-    "bot",
-    "sqlite",
-    "moderation",
-    "games"
-  ],
-  "author": "private",
+  "author": "Your Name",
   "license": "MIT"
 }
