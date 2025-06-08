@@ -1,9 +1,9 @@
 {
-  "name": "discord-channel-singlebot",
+  "name": "discordjs-large-demo",
   "version": "1.0.0",
-  "description": "A full-featured Discord bot for a single channel, includes moderation, todo, fun and user tools.",
-  "type": "module",
+  "description": "Large-scale Discord bot using discord.js, sqlite, and advanced features.",
   "main": "main.mjs",
+  "type": "module",
   "scripts": {
     "start": "node main.mjs"
   },
@@ -11,19 +11,20 @@
     "discord.js": "^14.14.1",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "node-fetch": "^3.3.2",
-    "humanize-duration": "^3.29.0"
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^3.3.2"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.0.0"
   },
   "keywords": [
     "discord",
+    "discord.js",
     "bot",
     "sqlite",
-    "fun",
-    "productivity",
-    "moderation"
+    "slash-commands",
+    "docker"
   ],
+  "author": "your-name",
   "license": "MIT"
 }
