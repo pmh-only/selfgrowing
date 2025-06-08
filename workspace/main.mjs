@@ -417,8 +417,13 @@ const contextCommands = [
             description: 'Remove all your pending reminders at once (UX quick clean).'
         },
 
-
+    // --- ADDITIONAL FEATURE: MESSAGE PINNED LIST SLASH (register missing) ---
+    {
+        name: "pinned",
+        description: "View the last 10 pinned messages (with jump links/note)."
+    },
     // ... previous commands ...
+
         // NEW FEATURE: /gg and /ggleaderboard slash commands registration
         {
             name: "gg",

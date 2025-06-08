@@ -1,28 +1,22 @@
 {
-  "name": "discord-large-bot",
+  "name": "discord-bot-main-file",
   "version": "1.0.0",
   "type": "module",
+  "description": "Large scale single-file Discord.js bot with public user features, moderation, fun and productivity tools.",
   "main": "main.mjs",
-  "description": "A large scale Discord bot with moderation, games, fun utilities, and public tools.",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "node-fetch": "^3.3.2",
-    "humanize-duration": "^3.29.0"
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^2.6.12"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.0.0"
   },
-  "keywords": [
-    "discord",
-    "bot",
-    "sqlite",
-    "games",
-    "moderation"
-  ],
-  "license": "UNLICENSED"
+  "author": "Bot Author",
+  "license": "MIT"
 }
