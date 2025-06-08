@@ -1,18 +1,18 @@
 {
-  "name": "discord-epic-bot",
-  "version": "1.0.0",
-  "description": "A large scale discord.js bot with rich slash commands, UX, and moderation/game tools.",
+  "name": "discordjs-largebot",
   "type": "module",
+  "version": "1.0.0",
+  "description": "A large scale Discord.js bot with sqlite persistence, moderation, gaming and productivity features.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.29.0",
-    "node-fetch": "^3.3.2"
+    "sqlite3": "^5.1.6",
+    "node-fetch": "^3.3.2",
+    "humanize-duration": "^3.29.0"
   },
   "engines": {
     "node": ">=18.0.0"

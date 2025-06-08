@@ -609,6 +609,17 @@ const contextCommands = [
     // ... previous commands ...
     // [NEW FEATURE REGISTER]: /recent for fetching last 10 messages
 
+    // --- [NEW FEATURE]: MODSAY - admin say as bot, with embed ---
+    {
+        name: "modsay",
+        description: "Send a message as the bot (as embed, admin/fun), with color",
+        options: [
+            { name: "content", type: 3, description: "Text to send", required: true },
+            { name: "color", type: 3, description: "Hex color (e.g. #fbb034)", required: false }
+        ]
+    },
+
+
 
 
 
@@ -1501,6 +1512,28 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
         return;
     }
+
+    // --- [NEW FEATURE] MODSAY: Say as Bot as an Embed (admin utility/fun/mod tool)
+    if (interaction.isChatInputCommand && interaction.commandName === "modsay") {
+        let msg = interaction.options.getString("content");
+        let color = interaction.options.getString("color");
+        // Validate color as hex, fallback default
+        let colorVal = 0xfbb034;
+        if (color && /^#?[0-9a-f]{6}$/i.test(color.trim())) {
+            colorVal = parseInt(color.replace("#",""), 16);
+        }
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                  .setDescription(msg.substring(0, 2000))
+                  .setColor(colorVal)
+                  .setFooter({text: "Sent by modsay | " + interaction.user.username})
+            ],
+            allowedMentions: { parse: [] }
+        });
+        return;
+    }
+
 
     if (interaction.isChatInputCommand && interaction.commandName === "feedbacklist") {
         // Show most recent 6 feedback entries, highest voted first
