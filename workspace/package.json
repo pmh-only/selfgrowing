@@ -1,7 +1,7 @@
 {
-  "name": "discordjs-largebot",
+  "name": "discord-private-bot",
   "version": "1.0.0",
-  "description": "Private full-featured Discord bot with moderation, fun, productivity tools, SQLite persistence.",
+  "description": "A large scale private Discord bot with admin, moderation, fun, and user tools.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -17,6 +17,6 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "Your Name",
+  "author": "PrivateBot",
   "license": "MIT"
 }

@@ -439,6 +439,14 @@ const contextCommands = [
             { name: 'reason', type: 3, description: "Reason for reporting", required: true }
         ]
     },
+    // --- ADDITIONAL FEATURE: CLEARMESSAGES (Moderation) ---
+    {
+        name: 'clearmessages',
+        description: "Delete a user's last 100 messages in this channel (and log)",
+        options: [
+            { name: 'target_user', type: 6, description: "User whose messages to delete", required: true }
+        ]
+    },
     // --- ADDITIONAL FEATURE: PER-USER SETTINGS (Mute XP) ---
     {
         name: "settings_user",
@@ -471,6 +479,7 @@ const contextCommands = [
     },
     // ... previous commands ...
     // [NEW FEATURE REGISTER]: /recent for fetching last 10 messages
+
 
 
 
