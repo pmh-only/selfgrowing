@@ -512,6 +512,33 @@ const contextCommands = [
             description: "Show top GG (👏) senders in this channel!"
         },
 
+
+        // === [ADDED: UX IMPROVEMENT] /todo clearall command for EZ cleanup of completed ===
+        {
+            name: "todo",
+            description: "Manage a public to-do list in the main channel",
+            options: [
+                { name:'add',type:1, description:"Add a new to-do", options:[
+                    { name:'content', type:3, description:"To-do description", required:true }
+                ]},
+                { name:'complete', type:1, description:"Mark a to-do as completed", options:[
+                    { name: 'number', type:4, description:"To-do item number", required:true }
+                ]},
+                { name:'remove', type:1, description:"Delete a to-do item", options:[
+                    { name: 'number', type:4, description:"To-do item number", required:true }
+                ]},
+                { name:'list', type:1, description:"List the public to-do items" },
+                { name:'edit', type:1, description:"Edit a to-do", options:[
+                    { name:'number', type:4, description:"To-do item number", required:true },
+                    { name:'content', type:3, description:"New content", required:true }
+                ]},
+                // NEW FEATURE: Bulk complete all to-dos
+                { name:'completeall', type:1, description:"Mark all to-dos as completed" },
+                // NEW FEATURE: Bulk clear completed to-dos (UX public cleanup)
+                { name:'clearall', type:1, description:"Clear all completed to-dos" }
+            ]
+        },
+
     // --- ADDITIONAL FEATURE: REMINDER REMOVE COMMAND ---
     {
         name: 'reminderremove',
@@ -520,6 +547,7 @@ const contextCommands = [
             { name: 'number', type: 4, description: 'Reminder number as seen in /reminders.', required: true }
         ]
     },
+
 
     // --- NEW FEATURE: PUBLIC USER REACTION HISTORY (/myreactions) ---
     {
@@ -671,28 +699,8 @@ const contextCommands = [
         name: "pollresults",
         description: "Show active poll results"
     },
-    {
-        name: "todo",
-        description: "Manage a public to-do list in the main channel",
-        options: [
-            { name:'add',type:1, description:"Add a new to-do", options:[
-              { name:'content', type:3, description:"To-do description", required:true }
-            ]},
-            { name:'complete', type:1, description:"Mark a to-do as completed", options:[
-                { name: 'number', type:4, description:"To-do item number", required:true }
-            ]},
-            { name:'remove', type:1, description:"Delete a to-do item", options:[
-                { name: 'number', type:4, description:"To-do item number", required:true }
-            ]},
-            { name:'list', type:1, description:"List the public to-do items" },
-            { name:'edit', type:1, description:"Edit a to-do", options:[
-                { name:'number', type:4, description:"To-do item number", required:true },
-                { name:'content', type:3, description:"New content", required:true }
-            ]},
-            // NEW FEATURE: Bulk complete all to-dos
-            { name:'completeall', type:1, description:"Mark all to-dos as completed" }
-        ]
-    },
+    // Duplicate - will be removed and updated above!
+
 
 
 
@@ -2279,6 +2287,7 @@ return;
         }
         return;
     }
+
 
 
 
