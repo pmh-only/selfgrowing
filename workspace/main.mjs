@@ -2678,6 +2678,39 @@ return;
         return;
     }
 
+    // --- ADDITIONAL FEATURE: MSGSEARCH ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "msgsearch") {
+        let keyword = interaction.options.getString("keyword").toLowerCase().trim();
+        if (!keyword || keyword.length < 2) {
+            await interaction.reply({content: "Please enter a longer search keyword.", allowedMentions: { parse: [] }});
+            return;
+        }
+        try {
+            // Search message_logs for content that matches (visible to all, only last 50 for safety)
+            let found = await db.all(
+                "SELECT username, content, createdAt FROM message_logs WHERE content LIKE ? ORDER BY createdAt DESC LIMIT 10",
+                `%${keyword}%`
+            );
+            if (!found.length) {
+                await interaction.reply({content: `No previous messages found containing "${keyword}".`, allowedMentions: { parse: [] }});
+                return;
+            }
+            // Display formatted embed
+            let embed = new EmbedBuilder()
+                .setTitle(`🔍 Message Search for "${keyword}"`)
+                .setDescription(found.map((m, i) =>
+                    `**#${i+1}** [${m.username||"-"}] — _${m.content.slice(0, 120)}_ (<t:${Math.floor(m.createdAt/1000)}:R>)`
+                ).join("\n"))
+                .setFooter({text: `Showing last ${found.length} matches`})
+                .setColor(0x39a5a4);
+            await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
+        } catch (e) {
+            await interaction.reply({content: "Failed to perform search (db error).", allowedMentions: { parse: [] }});
+        }
+        return;
+    }
+
+
     // --- SLASH: SNIPE ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'snipe') {
         const lastDeleted = await db.get('SELECT * FROM message_logs WHERE deleted=1 ORDER BY createdAt DESC LIMIT 1');
