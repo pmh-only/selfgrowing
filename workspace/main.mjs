@@ -1391,7 +1391,7 @@ return;
         await interaction.reply({
             embeds: [
                 new EmbedBuilder()
-                    .setTitle(`${tgt.tag}'s Avatar`)
+                    .setTitle(`${tgt.username}'s Avatar`)
                     .setImage(tgt.displayAvatarURL({ extension: 'png', size: 4096}))
                     .setColor(0x30cdfa)
             ],
@@ -1399,6 +1399,7 @@ return;
         });
         return;
     }
+
 
 
 
