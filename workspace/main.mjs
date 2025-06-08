@@ -495,11 +495,6 @@ const contextCommands = [
             { name: 'number', type: 4, description: 'Reminder number as seen in /reminders.', required: true }
         ]
     },
-    // --- Additional Feature: Reminders clear all ---
-    {
-        name: 'remindersclear',
-        description: 'Remove all your pending reminders at once.'
-    },
 
     // --- NEW FEATURE: PUBLIC USER REACTION HISTORY (/myreactions) ---
     {
