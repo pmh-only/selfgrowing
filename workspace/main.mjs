@@ -380,6 +380,7 @@ import path from 'path';
 import fetch from 'node-fetch';
 
 // Add context menu (right click) commands for message/user actions
+// Added "userinfo" context menu command
 const contextCommands = [
 
     {
@@ -409,8 +410,14 @@ const contextCommands = [
     {
         name: 'Report',
         type: 3 // MESSAGE context menu
+    },
+    // NEW: PUBLIC USERINFO context menu - show public info, XP, last message, warnings etc
+    {
+        name: 'User Info',
+        type: 2 // USER context
     }
 ];
+
 
 
 // --- Slash commands registration ---
