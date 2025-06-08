@@ -2266,7 +2266,7 @@ return;
             }
         }
         // NEW FEATURE: Add "Clear All Completed" for fast cleaning up finished items (public, admin/UX tool)
-        // Check for "clearall" subcommand via manual trigger (to avoid modifying original to-do slash structure)
+        // "clearall" subcommand: lets user remove all completed to-dos at once
         else if (sub === "clearall") {
             // Remove all completed todos
             let completed = await db.all("SELECT id FROM todo_entries WHERE done=1");
@@ -2279,6 +2279,7 @@ return;
         }
         return;
     }
+
 
 
 
