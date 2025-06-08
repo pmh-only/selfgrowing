@@ -429,6 +429,11 @@ const contextCommands = [
             name: 'remindersclear',
             description: 'Remove all your pending reminders at once (UX quick clean).'
         },
+        // --- [NEW FEATURE] RANDOM USER ---
+        {
+            name: 'randomuser',
+            description: 'Pick a random user from recent participants (fun/randomizer)!'
+        },
 
     // --- ADDITIONAL FEATURE: REPORT from context menu (register missing) ---
     {
@@ -479,6 +484,7 @@ const contextCommands = [
     },
     // ... previous commands ...
     // [NEW FEATURE REGISTER]: /recent for fetching last 10 messages
+
 
 
 
@@ -1006,6 +1012,40 @@ const eightBallResponses = [
  */
 client.on('interactionCreate', async interaction => {
     
+    // --- ADDITIONAL FEATURE: /randomuser: Pick a random user who has participated recently ---
+    if (interaction.isChatInputCommand && interaction.commandName === 'randomuser') {
+        try {
+            // We'll consider the last 1000 message_logs as "recent participants"
+            let logs = await db.all("SELECT userId FROM message_logs WHERE userId IS NOT NULL ORDER BY createdAt DESC LIMIT 1000");
+            let pool = Array.from(new Set(logs.map(l => l.userId))); // Unique list
+            if (!pool.length) {
+                await interaction.reply({ content: "No recent users found to pick from!", allowedMentions: { parse: [] } });
+                return;
+            }
+            // Pick one at random
+            let pickId = pool[Math.floor(Math.random() * pool.length)];
+            let uname = pickId;
+            try {
+                let u = await client.users.fetch(pickId);
+                uname = u.username;
+            } catch {}
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🎲 Random User Picker")
+                        .setDescription(`Randomly picked user: **${uname}**!`)
+                        .setFooter({ text: `Random pick from ${pool.length} recent users.` })
+                        .setColor(0x6ee7b7)
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({ content: "Failed to pick a user randomly.", allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
+
     // --- ADDITIONAL FEATURE: /settings_user PER-USER SETTINGS (Mute XP) ---
     if (interaction.isChatInputCommand && interaction.commandName === 'settings_user') {
         let mutedColumnExists = false;
@@ -1038,6 +1078,7 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
 
     // --- ADDITIONAL FEATURE: REPORT MESSAGE CONTEXT MENU ---
     if (interaction.isMessageContextMenuCommand?.() && interaction.commandName === "Report") {
