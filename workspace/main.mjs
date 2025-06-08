@@ -357,6 +357,11 @@ const contextCommands = [
     {
         name: 'Thumbs Down',
         type: 3 // MESSAGE context menu
+    },
+    // NEW FEATURE: GG Leaderboard command registration (for right-click)
+    {
+        name: 'GG Leaderboard',
+        type: 2 // USER context, just for fun
     }
 ];
 
@@ -364,7 +369,18 @@ const contextCommands = [
 // --- Slash commands registration ---
     // [FEATURE] Add /feedback and /feedbacklist slash commands for public feedback board.
     const commands = [
+
     // ... previous commands ...
+        // NEW FEATURE: /gg and /ggleaderboard slash commands registration
+        {
+            name: "gg",
+            description: "Show your GG count (earn by writing 'gg' in chat)"
+        },
+        {
+            name: "ggleaderboard",
+            description: "Show top GG (👏) senders in this channel!"
+        },
+
     // --- ADDITIONAL FEATURE: REMINDER REMOVE COMMAND ---
     {
         name: 'reminderremove',
@@ -864,6 +880,79 @@ const eightBallResponses = [
  * Also: fix interaction.channel.type undefined bug for system/app_home/other types. DMs are type === 1 or interaction.channel is null (DM), text/guild channels differ.
  */
 client.on('interactionCreate', async interaction => {
+    
+    // --- GG COMMAND HANDLERS ---
+    if (interaction.isChatInputCommand && (interaction.commandName === "gg" || interaction.commandName === "ggleaderboard")) {
+        // Ensure table
+        try { await db.run("CREATE TABLE IF NOT EXISTS ggrecords (userId TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0)"); } catch {}
+        if (interaction.commandName === "gg") {
+            let row = await db.get("SELECT count FROM ggrecords WHERE userId=?", interaction.user.id);
+            let count = row ? row.count : 0;
+            await interaction.reply({
+                content: `👏 You have sent "gg" ${count} time${count===1?"":"s"} in this channel! Keep congratulating others!`,
+                allowedMentions: { parse: [] }
+            });
+        } else {
+            // Leaderboard
+            let recs = await db.all("SELECT * FROM ggrecords ORDER BY count DESC LIMIT 10");
+            if (!recs.length) {
+                await interaction.reply({ content: "No GGs have been sent yet! Be the first to say gg!", allowedMentions: { parse: [] } });
+                return;
+            }
+            // Fetch usernames
+            let nameMap = {};
+            for (const r of recs) {
+                try {
+                    let user = await client.users.fetch(r.userId);
+                    nameMap[r.userId] = user.username;
+                } catch {
+                    nameMap[r.userId] = r.userId;
+                }
+            }
+            let desc = recs.map((r,i)=>`#${i+1}: **${nameMap[r.userId]}** — ${r.count} GG👏`).join('\n');
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("👏 GG Leaderboard")
+                        .setDescription(desc)
+                        .setColor(0x96fbc7)
+                ],
+                allowedMentions: { parse: [] }
+            });
+        }
+        return;
+    }
+
+    // GG LEADERBOARD context menu: right-click
+    if (interaction.isUserContextMenuCommand?.() && interaction.commandName === "GG Leaderboard") {
+        try { await db.run("CREATE TABLE IF NOT EXISTS ggrecords (userId TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0)"); } catch {}
+        let recs = await db.all("SELECT * FROM ggrecords ORDER BY count DESC LIMIT 10");
+        if (!recs.length) {
+            await interaction.reply({ content: "No GGs have been sent yet! Be first to say 'gg' in chat to appear here!", allowedMentions: { parse: [] }});
+            return;
+        }
+        let nameMap = {};
+        for (const r of recs) {
+            try {
+                let user = await client.users.fetch(r.userId);
+                nameMap[r.userId] = user.username;
+            } catch {
+                nameMap[r.userId] = r.userId;
+            }
+        }
+        let desc = recs.map((r,i)=>`#${i+1}: **${nameMap[r.userId]}** — ${r.count} GG👏`).join('\n');
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("👏 GG Leaderboard")
+                    .setDescription(desc)
+                    .setColor(0xfffca8)
+            ],
+            allowedMentions: { parse: [] }
+        });
+        return;
+    }
+
 
     // --- NEW FEATURE: /myreactions ---
 
@@ -2959,6 +3048,24 @@ client.on('messageCreate', async msg => {
         lastMessageUserCache[msg.author.id] = { username: msg.member?.user?.tag || msg.author.username };
     }
 
+    // --- NEW FEATURE: AUTOREACT TO "GG" IN MESSAGES, AND TRACK GGs ---
+    // If a message contains "gg" (case-insensitive, and not a bot), react with 👏 and save to gg table.
+    // Shows public fun leaderboard on /gg or /ggleaderboard
+    if (msg.guild) {
+        if (/(^|\s)gg(!|$|\s)/i.test(msg.content) && !msg.author.bot) {
+            // React with 👏
+            try { await msg.react('👏'); } catch {}
+            // Save to ggrecords table (upsert or add), counting per-user "gg" count.
+            await db.run("CREATE TABLE IF NOT EXISTS ggrecords (userId TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0)");
+            let row = await db.get("SELECT count FROM ggrecords WHERE userId=?", msg.author.id);
+            if (row) {
+                await db.run("UPDATE ggrecords SET count = count+1 WHERE userId=?", msg.author.id);
+            } else {
+                await db.run("INSERT INTO ggrecords(userId,count) VALUES (?,1)", msg.author.id);
+            }
+        }
+    }
+
 
     // Don't run in DMs except for reminders/notes slash cmds
     // XP, content moderation, games: only in main channel
@@ -3014,6 +3121,7 @@ client.on('messageCreate', async msg => {
     }
 
 });
+
 
 
 client.on('interactionCreate', async interaction => {
