@@ -411,6 +411,12 @@ const contextCommands = [
 // --- Slash commands registration ---
     // [FEATURE] Add /feedback and /feedbacklist slash commands for public feedback board.
     const commands = [
+        // NEW FEATURE: /remindersclear command for clearing all your reminders
+        {
+            name: 'remindersclear',
+            description: 'Remove all your pending reminders at once (UX quick clean).'
+        },
+
 
     // ... previous commands ...
         // NEW FEATURE: /gg and /ggleaderboard slash commands registration
@@ -431,6 +437,12 @@ const contextCommands = [
             { name: 'number', type: 4, description: 'Reminder number as seen in /reminders.', required: true }
         ]
     },
+    // --- Additional Feature: Reminders clear all ---
+    {
+        name: 'remindersclear',
+        description: 'Remove all your pending reminders at once.'
+    },
+
     // --- NEW FEATURE: PUBLIC USER REACTION HISTORY (/myreactions) ---
     {
         name: "myreactions",
@@ -1832,6 +1844,30 @@ return;
         scheduleReminders(client);
         return;
     }
+
+    // --- Additional Feature: REMINDERSCLEAR: Remove ALL pending reminders from yourself (UX) ---
+    if (interaction.isChatInputCommand && interaction.commandName === 'remindersclear') {
+        const myReminders = await db.all('SELECT id FROM reminders WHERE userId=?', interaction.user.id);
+        if (!myReminders.length) {
+            await interaction.reply({ content: "You have no scheduled reminders to clear.", allowedMentions: { parse: [] } });
+            return;
+        }
+        await db.run('DELETE FROM reminders WHERE userId=?', interaction.user.id);
+        // UX: Show how many were cleared
+        await interaction.reply({
+            content: `✅ Cleared all your pending reminders (${myReminders.length} removed).`,
+            allowedMentions: { parse: [] }
+        });
+        scheduleReminders(client); // reschedule future
+        return;
+    }
+
+
+
+
+
+
+
 
 
 
