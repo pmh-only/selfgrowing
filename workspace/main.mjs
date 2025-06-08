@@ -2244,8 +2244,21 @@ return;
             await interaction.reply({content: `✏️ To-Do item #${idx} updated.\nBefore: "${oldContent}"\nAfter: "${newContent}"`, allowedMentions: { parse: [] }});
 
         }
+        // NEW FEATURE: Add "Clear All Completed" for fast cleaning up finished items (public, admin/UX tool)
+        // Check for "clearall" subcommand via manual trigger (to avoid modifying original to-do slash structure)
+        else if (sub === "clearall") {
+            // Remove all completed todos
+            let completed = await db.all("SELECT id FROM todo_entries WHERE done=1");
+            if (completed.length === 0) {
+                await interaction.reply({content:"No completed to-dos to clear!", allowedMentions: { parse: [] } });
+                return;
+            }
+            await db.run("DELETE FROM todo_entries WHERE done=1");
+            await interaction.reply({content:`🧹 Cleared ${completed.length} completed to-dos from the public to-do list.`, allowedMentions: { parse: [] }});
+        }
         return;
     }
+
 
 
 

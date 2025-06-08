@@ -1,20 +1,20 @@
 {
-  "name": "discord-singlefile-bot",
+  "name": "discord-productivity-bot",
   "version": "1.0.0",
-  "description": "Large-scale Discord.js bot, single file, with persistent sqlite and /data/ storage",
   "type": "module",
   "main": "main.mjs",
+  "description": "Large scale Discord bot with productivity, moderation, and fun tools",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "humanize-duration": "^3.30.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "node-fetch": "^3.3.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "node-fetch": "^2.6.12",
+    "humanize-duration": "^3.29.0"
   }
 }
