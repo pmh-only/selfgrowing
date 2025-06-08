@@ -1,19 +1,29 @@
 {
-  "name": "discord-bot",
+  "name": "discord-channelbot",
   "version": "1.0.0",
-  "description": "A feature-rich Discord bot with fun, productivity, and moderation tools for a single channel.",
-  "main": "main.mjs",
   "type": "module",
+  "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
-  "author": "Your Name",
-  "license": "MIT",
   "dependencies": {
-    "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
+    "discord.js": "^14.13.0",
     "sqlite": "^5.1.1",
-    "node-fetch": "^3.3.2",
-    "humanize-duration": "^3.29.0"
-  }
+    "sqlite3": "^5.1.6",
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "moderation",
+    "channel",
+    "slash-commands",
+    "fun"
+  ],
+  "author": "private",
+  "license": "MIT"
 }

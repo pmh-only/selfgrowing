@@ -404,6 +404,11 @@ const contextCommands = [
     {
         name: 'GG Leaderboard',
         type: 2 // USER context, just for fun
+    },
+    // ADDITIONAL FEATURE: REPORT context menu (message command)
+    {
+        name: 'Report',
+        type: 3 // MESSAGE context menu
     }
 ];
 
@@ -420,7 +425,15 @@ const contextCommands = [
             name: 'remindersclear',
             description: 'Remove all your pending reminders at once (UX quick clean).'
         },
-
+    // --- ADDITIONAL FEATURE: REPORT from context menu (register missing) ---
+    {
+        name: 'report',
+        description: 'Report a message for review.',
+        options: [
+            { name: 'message_id', type: 3, description: "Message ID to report", required: true },
+            { name: 'reason', type: 3, description: "Reason for reporting", required: true }
+        ]
+    },
     // --- ADDITIONAL FEATURE: PER-USER SETTINGS (Mute XP) ---
     {
         name: "settings_user",
@@ -430,6 +443,7 @@ const contextCommands = [
             { name: "clear_xp_mute", type: 5, description: "Clear your XP mute if set", required: false }
         ]
     },
+
 
     // --- ADDITIONAL FEATURE: MESSAGE PINNED LIST SLASH (register missing) ---
     {
@@ -996,6 +1010,83 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
+    // --- ADDITIONAL FEATURE: REPORT MESSAGE CONTEXT MENU ---
+    if (interaction.isMessageContextMenuCommand?.() && interaction.commandName === "Report") {
+        // Pop up a modal for report reason
+        const modal = new ModalBuilder()
+            .setTitle('Report Message')
+            .setCustomId('report_message_modal_' + interaction.targetMessage.id)
+            .addComponents(
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('reason')
+                        .setLabel('Reason for reporting')
+                        .setStyle(TextInputStyle.Short)
+                        .setPlaceholder('Why is this message being reported?')
+                        .setRequired(true)
+                )
+            );
+        client._pendingReportModalMsgId = interaction.targetMessage.id;
+        client._pendingReportContextUser = interaction.user;
+        await interaction.showModal(modal);
+        return;
+    }
+    // Modal submit handler for report modal
+    if (interaction.isModalSubmit?.() && interaction.customId?.startsWith?.('report_message_modal_')) {
+        // Confirm modal submit, extract info
+        const messageId = interaction.customId.replace('report_message_modal_', '');
+        const reason = interaction.fields.getTextInputValue('reason');
+        let reportingUser = client._pendingReportContextUser || interaction.user;
+        // Call the same logic as /report, but programmatically
+        try {
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            let msg;
+            try {
+                msg = await chan.messages.fetch(messageId);
+            } catch {
+                msg = null;
+            }
+            // Prepare report
+            let reports = [];
+            try { reports = await readJSONFile("reports.json", []); } catch {}
+            const reportObj = {
+                reporterId: reportingUser.id,
+                reporterName: reportingUser.username,
+                messageId: messageId,
+                reportedContent: msg ? msg.content : "[Deleted/unavailable]",
+                reportedAuthorId: msg ? msg.author.id : null,
+                reportedAuthorName: msg ? msg.author.username : null,
+                reason,
+                reportedAt: Date.now()
+            };
+            reports.push(reportObj);
+            if (reports.length > 50) reports = reports.slice(-50);
+            await saveJSONFile("reports.json", reports);
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🚩 Message Reported")
+                        .setDescription(`Message ${msg ? `from "${msg.author.username}"` : `[unavailable]`} has been reported.`)
+                        .addFields(
+                            { name: "Reason", value: reason },
+                            { name: "Message ID", value: messageId },
+                            { name: "Reporter", value: reportingUser.username }
+                        )
+                        .setFooter({ text: "All reports are public and logged in /reports" })
+                        .setColor(0xff3b3b)
+                        .setTimestamp()
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({ content: "Failed to report the message. Make sure the ID is correct!", allowedMentions: { parse: [] } });
+        }
+        client._pendingReportModalMsgId = null;
+        client._pendingReportContextUser = null;
+        return;
+    }
+
 
     // --- GG COMMAND HANDLERS ---
     if (interaction.isChatInputCommand && (interaction.commandName === "gg" || interaction.commandName === "ggleaderboard")) {
