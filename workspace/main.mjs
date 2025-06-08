@@ -472,6 +472,12 @@ const contextCommands = [
             { name: "keyword", type: 3, description: "Keyword to search for", required: true }
         ]
     },
+    // --- Additional Feature: Public fun fact list/leaderboard command ---
+    {
+        name: 'funfacts',
+        description: 'Show the last few fun facts posted in this channel!'
+    },
+
 
 
         {
@@ -1510,6 +1516,84 @@ return;
         }
         return;
     }
+
+    // --- SLASH: FUNFACT ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'funfact') {
+        // Fun facts list (expand as desired)
+        const funFacts = [
+            "Honey never spoils. Archaeologists have eaten 3,000-year-old honey and found it edible!",
+            "A group of flamingos is called a 'flamboyance.'",
+            "Bananas are technically berries, but strawberries aren't.",
+            "The Eiffel Tower can be 15 cm taller during hot days.",
+            "Octopuses have three hearts.",
+            "You can't hum while holding your nose (try it!).",
+            "There are more trees on Earth than stars in the Milky Way.",
+            "Wombat poops are cube-shaped.",
+            "Oxford University is older than the Aztec Empire.",
+            "Some turtles can breathe through their butts.",
+            "The unicorn is the national animal of Scotland.",
+            "Venus is the only planet that spins clockwise.",
+            "A day on Venus is longer than a year on Venus.",
+            "The inventor of the Frisbee was turned into a Frisbee after he died.",
+            "Cows have best friends and can become stressed when separated.",
+            "A single strand of spaghetti is called a 'spaghetto.'",
+            "If you shuffle a deck of cards properly, chances are that exact order has never been seen before in history.",
+            "Sharks existed before trees.",
+            "The wood frog can hold its pee for up to eight months.",
+            "Sloths can hold their breath longer than dolphins can."
+        ];
+        // Save recent fun facts for leaderboard & UX
+        let funHist = [];
+        try { funHist = await readJSONFile("fun_facts_history.json", []); } catch {}
+        const pick = funFacts[Math.floor(Math.random() * funFacts.length)];
+        let uname = interaction.user?.username || interaction.user?.id || "Unknown";
+        funHist.push({
+            user: uname,
+            fact: pick,
+            at: Date.now()
+        });
+        // Only keep last 20
+        if (funHist.length > 20) funHist = funHist.slice(-20);
+        await saveJSONFile("fun_facts_history.json", funHist);
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                  .setTitle("🎉 Fun Fact")
+                  .setDescription(`"${pick}"`)
+                  .setFooter({ text: `Shared by ${uname}` })
+                  .setColor(0xfcba03)
+            ],
+            allowedMentions: { parse: [] }
+        });
+        return;
+    }
+
+    // --- SLASH: FUNFACTS (recent posts leaderboard) ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'funfacts') {
+        // Show last 6 facts from /data/fun_facts_history.json
+        let funHist = [];
+        try { funHist = await readJSONFile("fun_facts_history.json", []); } catch {}
+        if (!funHist.length) {
+            await interaction.reply({content:"No fun facts shared yet. Try `/funfact` to share one!", allowedMentions: { parse: [] }});
+            return;
+        }
+        const factsToShow = funHist.slice(-6).reverse();
+        let embed = new EmbedBuilder()
+            .setTitle("🎉 Recent Fun Facts")
+            .setDescription(
+                factsToShow.map((f, i) =>
+                    `**[${i+1}]** ${f.fact}\n*— ${f.user} (<t:${Math.floor(f.at/1000)}:R>)*`
+                ).join("\n\n")
+            )
+            .setFooter({text: "Want to share more? Use /funfact!" })
+            .setColor(0xfde68a);
+        await interaction.reply({
+            embeds: [embed],
+            allowedMentions: { parse: [] }
+        });
+        return;
+    }
+
 
 
     // --- SLASH: QUOTES (random, filter by tag) ---

@@ -1,22 +1,22 @@
 {
-  "name": "discord-bot-main-file",
+  "name": "discord-feature-bot",
   "version": "1.0.0",
   "type": "module",
-  "description": "Large scale single-file Discord.js bot with public user features, moderation, fun and productivity tools.",
+  "description": "Large scale Discord.js bot with sqlite & feature-rich slash commands",
   "main": "main.mjs",
   "scripts": {
-    "start": "node main.mjs"
+    "start": "NODE_ENV=production node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0",
-    "node-fetch": "^2.6.12"
+    "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "Bot Author",
+  "author": "",
   "license": "MIT"
 }
