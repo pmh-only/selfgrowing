@@ -449,7 +449,18 @@ const contextCommands = [
         name: "archive",
         description: "Download the last 50 public messages as a text file." 
     },
-
+    // --- ADDITIONAL FEATURE: REMINDER EXPORT IMPORT ---
+    {
+        name: "reminderexport",
+        description: "Export your reminders as a JSON file."
+    },
+    {
+        name: "reminderimport",
+        description: "Import reminders from a JSON text (paste full JSON array).",
+        options: [
+            { name: "json", type: 3, description: "Reminders JSON from /reminderexport", required: true }
+        ]
+    },
     // --- ADDITIONAL FEATURE: MESSAGE PINNED LIST SLASH (register missing) ---
     {
         name: "pinned",
@@ -457,6 +468,7 @@ const contextCommands = [
     },
     // ... previous commands ...
     // [NEW FEATURE REGISTER]: /recent for fetching last 10 messages
+
 
 
 
@@ -2379,6 +2391,54 @@ return;
         await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
         return;
     }
+
+    // --- ADDITIONAL FEATURE: REMINDER EXPORT/IMPORT ---
+
+    if (interaction.isChatInputCommand && interaction.commandName === "reminderexport") {
+        // Export all your reminders in a JSON blob (downloadable)
+        let rows = await db.all('SELECT id, content, remindAt FROM reminders WHERE userId=? ORDER BY remindAt ASC', interaction.user.id);
+        if (!rows.length) {
+            await interaction.reply({ content: "You have no reminders to export.", allowedMentions: { parse: [] } });
+            return;
+        }
+        // Export as a code block to allow easy copy-paste for import, or as a file attachment
+        const jsonBlob = JSON.stringify(rows, null, 2);
+        await interaction.reply({
+            content: "Copy this JSON and save it to backup your reminders.\nYou can use `/reminderimport` later to restore them.\n```json\n" + jsonBlob + "\n```",
+            allowedMentions: { parse: [] }
+            // Note: If the file is long, can use file attachment API here for extra credit!
+        });
+        return;
+    }
+    if (interaction.isChatInputCommand && interaction.commandName === "reminderimport") {
+        // Import reminders from pasted JSON array
+        let jsonTxt = interaction.options.getString("json");
+        let arr;
+        try {
+            arr = JSON.parse(jsonTxt);
+        } catch(e) {
+            await interaction.reply({ content: "Failed to parse your JSON. Make sure it's a proper exported array!", allowedMentions: { parse: [] } });
+            return;
+        }
+        if (!Array.isArray(arr) || !arr.length || !arr.every(x => typeof x.content === "string" && typeof x.remindAt === "number")) {
+            await interaction.reply({ content: "Invalid format. Provide an array of reminders as exported!", allowedMentions: { parse: [] } });
+            return;
+        }
+        // Only import up to 100 at a time for sanity
+        let count = 0, now = Date.now();
+        for (const item of arr) {
+            if (!item.content || typeof item.remindAt !== "number" || item.remindAt < now) continue; // skip past-due
+            if (++count > 100) break; // limit
+            await db.run('INSERT INTO reminders(userId, content, remindAt) VALUES (?,?,?)', interaction.user.id, item.content.substring(0,200), item.remindAt);
+        }
+        if (count)
+            await interaction.reply({ content: `✅ Imported ${count} reminders!`, allowedMentions: { parse: [] } });
+        else
+            await interaction.reply({ content: "No valid, future reminders found to import.", allowedMentions: { parse: [] } });
+        scheduleReminders(client);
+        return;
+    }
+
 
 
 
