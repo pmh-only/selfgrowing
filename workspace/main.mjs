@@ -264,32 +264,74 @@ await db.run(`CREATE TABLE IF NOT EXISTS xp (
 let reminderTimer = null;
 async function scheduleReminders(client) {
     if(reminderTimer) clearTimeout(reminderTimer);
+    // Get next scheduled reminder from single reminders table
     const next = await db.get("SELECT * FROM reminders ORDER BY remindAt ASC LIMIT 1");
-    if (!next) return;
-    const wait = Math.max(0, next.remindAt - Date.now());
+    // Get all recurring reminders from file, that are due now or sooner
+    let recur = [];
+    let dueRecur = [];
+    try { recur = await readJSONFile("recurring_reminders.json", []); } catch {}
+    const now = Date.now();
+    if (recur && recur.length) {
+        dueRecur = recur.filter(r => r.nextAt && r.nextAt <= now);
+    }
+
+    // Pick which occurs first
+    let earliest = null;
+    if (next && (!dueRecur.length || next.remindAt < dueRecur[0]?.nextAt)) earliest = { type: "once", item: next };
+    else if (dueRecur.length) earliest = { type: "recur", item: dueRecur[0] };
+    if (!earliest) {
+        // No reminders at all, but may be some in future for recurs
+        let futureRecurs = recur.filter(r => r.nextAt && r.nextAt > now);
+        let soonestFuture = null;
+        if (futureRecurs.length) soonestFuture = futureRecurs.sort((a,b)=>a.nextAt-b.nextAt)[0];
+        if (soonestFuture) {
+            let wait = Math.max(0, soonestFuture.nextAt - now);
+            reminderTimer = setTimeout(()=>scheduleReminders(client), wait);
+            return;
+        }
+        return;
+    }
+    let wait = 0;
+    if (earliest.type === "once") wait = Math.max(0, earliest.item.remindAt - now);
+    else if (earliest.type === "recur") wait = Math.max(0, earliest.item.nextAt - now);
+
     reminderTimer = setTimeout(async () => {
         try {
-            // All reminders sent to public channel now, per restrictions. No DM.
-            const chan = client.channels.cache.get(CHANNEL_ID);
+            const chan = client.channels.cache.get(CHANNEL_ID) || (await client.channels.fetch(CHANNEL_ID));
             if (chan?.isTextBased && chan?.send) {
-                // Remove mention: use only username so no ping!
-            let uname;
-            try {
-                let userObj = await client.users.fetch(next.userId);
-                uname = userObj.username;
-            } catch { uname = next.userId; }
-            await chan.send(`${uname}: [⏰ Reminder] ${next.content}`);
-
+                let uname;
+                try {
+                    let userObj = await client.users.fetch(earliest.item.userId);
+                    uname = userObj.username;
+                } catch { uname = earliest.item.userId; }
+                await chan.send(`${uname}: [⏰ Reminder] ${earliest.item.content}`);
             }
-            await db.run("DELETE FROM reminders WHERE id = ?", next.id);
-            // UX: Add to sent reminders log
-            try {
-                await db.run('INSERT INTO reminders_log(userId, content, remindAt, sentAt) VALUES (?,?,?,?)', next.userId, next.content, next.remindAt, Date.now());
-            } catch {}
+            if (earliest.type === "once") {
+                await db.run("DELETE FROM reminders WHERE id = ?", earliest.item.id);
+                try {
+                    await db.run('INSERT INTO reminders_log(userId, content, remindAt, sentAt) VALUES (?,?,?,?)', earliest.item.userId, earliest.item.content, earliest.item.remindAt, Date.now());
+                } catch {}
+            }
+            if (earliest.type === "recur") {
+                // Compute next occurrence: add interval to previous nextAt
+                let recurs = [];
+                try { recurs = await readJSONFile("recurring_reminders.json", []); } catch {}
+                // Advance nextAt repeatedly if missed far in past, so if bot restarts after downtime, doesn't send old reminders.
+                let thisIdx = recurs.findIndex(r => r.userId===earliest.item.userId && r.content===earliest.item.content && r.intervalMs===earliest.item.intervalMs);
+                if (thisIdx !== -1) {
+                    // Snap to "now + interval"
+                    let newNextAt = recurs[thisIdx].nextAt;
+                    while (newNextAt <= Date.now()) newNextAt += recurs[thisIdx].intervalMs;
+                    recurs[thisIdx].nextAt = newNextAt;
+                    await saveJSONFile("recurring_reminders.json", recurs);
+                }
+            }
         } catch(e){}
         scheduleReminders(client);
     }, wait);
 }
+
+
 
 
 
@@ -1750,8 +1792,26 @@ return;
         });
 
         scheduleReminders(client);
+
+        // --------- [NEW FEATURE] QUICK SET "RECURRING REMINDER" PUBLIC BUTTON ----------
+        // Button row, only if not already present
+        const recurRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('recurreminder_'+content.replace(/\W/g,"").slice(0,20))
+                .setLabel('Set This As Daily Recurring Reminder')
+                .setStyle(ButtonStyle.Secondary)
+        );
+        // Only show for simple <2d reminders, for demo
+        if (delay <= 2*24*60*60*1000) {
+            await interaction.followUp({
+                content: `Want this to repeat every day? Click below to convert into a daily recurring reminder!`,
+                components: [recurRow],
+                allowedMentions: { parse: [] }
+            });
+        }
         return;
     }
+
 
     // --- ADDITIONAL FEATURE: REMINDER REMOVE COMMAND ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'reminderremove') {
@@ -4300,6 +4360,39 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    // [NEW FEATURE] Recurring reminders (set daily)
+    if (interaction.isButton() && interaction.customId.startsWith("recurreminder_")) {
+        // Extract content from customId
+        let baseContent = interaction.customId.replace("recurreminder_","");
+        // Try to find a reminder of this content recently set by this user
+        let allRows = await db.all('SELECT id, content, remindAt FROM reminders WHERE userId=? ORDER BY remindAt DESC LIMIT 10', interaction.user.id);
+        let found = allRows.find(row => row.content && row.content.replace(/\W/g,"").slice(0,20) === baseContent);
+        if (!found) {
+            await interaction.reply({ content: "Could not set recurring reminder (was your reminder recent?)", allowedMentions: { parse: [] } });
+            return;
+        }
+        // Save to /data/recurring_reminders.json as a simple array
+        let recurs = [];
+        try { recurs = await readJSONFile("recurring_reminders.json", []); } catch {}
+        // Don't duplicate
+        if (recurs.find(r => r.userId===interaction.user.id && r.content===found.content && r.intervalMs===24*60*60*1000)) {
+            await interaction.reply({ content: "You already have this as a recurring reminder!", allowedMentions: { parse: [] } });
+            return;
+        }
+        recurs.push({
+            userId: interaction.user.id,
+            content: found.content,
+            nextAt: found.remindAt,
+            baseTime: found.remindAt,
+            intervalMs: 24*60*60*1000,
+            created: Date.now()
+        });
+        await saveJSONFile("recurring_reminders.json", recurs);
+        await interaction.reply({content: "✅ Set up as a daily recurring reminder! I will post it every day at this time.", allowedMentions: { parse: [] }});
+        // Optionally: update UI or send further info
+        return;
+    }
+
     // FIX: Guard .member on permission checks for admin DM/system
     if (
         typeof interaction.isChatInputCommand === "function" &&
@@ -4344,6 +4437,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 });
+
 
 // Get Started button handler for welcome embed (now always in main channel)
 client.on('interactionCreate', async interaction => {
