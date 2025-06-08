@@ -1,7 +1,7 @@
 {
-  "name": "discord-admin-funbot",
+  "name": "discord-singlefile-bot",
   "version": "1.0.0",
-  "description": "Large scale Discord.js bot with slash commands, moderation, games, and productivity tools",
+  "description": "A large scale Discord bot with single-file, sqlite and fs data, all slash and context commands. See main.mjs",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -11,23 +11,21 @@
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.29.0",
-    "fs-extra": "^11.2.0",
+    "humanize-duration": "^3.31.0",
     "node-fetch": "^3.3.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18"
   },
   "keywords": [
     "discord",
     "bot",
-    "admin",
-    "fun",
-    "slash",
-    "games",
-    "moderation",
-    "sqlite"
+    "discord.js",
+    "sqlite",
+    "single-file",
+    "slash-commands",
+    "context-menu"
   ],
-  "author": "YourName",
+  "author": "",
   "license": "MIT"
 }

@@ -423,6 +423,8 @@ const contextCommands = [
         description: "View the last 10 pinned messages (with jump links/note)."
     },
     // ... previous commands ...
+    // [NEW FEATURE REGISTER]: /recent for fetching last 10 messages
+
 
         // NEW FEATURE: /gg and /ggleaderboard slash commands registration
         {
@@ -3183,6 +3185,32 @@ return;
         await interaction.reply({embeds:[embed], allowedMentions: { parse: [] }});
         return;
     }
+
+    // --- NEW FEATURE: RECENT MESSAGES SLASH COMMAND ---
+    if (interaction.isChatInputCommand && interaction.commandName === 'recent') {
+        try {
+            // Fetch last 10 messages from message_logs
+            let recents = await db.all(
+                "SELECT username, content, createdAt FROM message_logs ORDER BY createdAt DESC LIMIT 10"
+            );
+            if (!recents.length) {
+                await interaction.reply({content: "No recent messages found.", allowedMentions: { parse: [] }});
+                return;
+            }
+            const embed = new EmbedBuilder()
+                .setTitle("🕑 Recent Messages")
+                .setDescription(recents.map((r, i) =>
+                    `**#${recents.length-i}** [${r.username||"-"}] — _${r.content.slice(0, 120)}_ (<t:${Math.floor(r.createdAt/1000)}:R>)`
+                ).join("\n"))
+                .setFooter({text: "Last 10 public messages"})
+                .setColor(0x3b82f6);
+            await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
+        } catch (e) {
+            await interaction.reply({content: "Failed to show recent messages.", allowedMentions: { parse: [] }});
+        }
+        return;
+    }
+
 
 
     // --- SLASH: COINFLIP ---
