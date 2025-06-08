@@ -803,6 +803,12 @@ const contextCommands = [
             { name:'user',type:6,description:"User",required:false }
         ]
     },
+    // --- NEW FEATURE: PUBLIC USERLIST SLASH COMMAND REGISTRATION ---
+    {
+        name: 'userlist',
+        description: "Show list of all users seen by bot (public, ordered by last update)"
+    },
+
     {
         name: 'reminders',
         description: "List your pending reminders"
@@ -1677,9 +1683,9 @@ return;
         return;
     }
 
-    // --- ADDITIONAL FEATURE: USERLIST ---
+    // --- PUBLIC FEATURE: USERLIST ---
     if (interaction.isChatInputCommand() && interaction.commandName === "userlist") {
-        // Fetch all users from user_tags table
+        // Fetch all users from user_tags table (ordered by updatedAt desc)
         let users = [];
         try {
             users = await db.all("SELECT userId, tag, updatedAt FROM user_tags ORDER BY updatedAt DESC");
@@ -1697,14 +1703,15 @@ return;
             }
         } catch {}
 
-        // Compose description
+        // Compose description, username (or stored user tag), join date if known.
         let desc = users.map((u,i) => {
             let join = msgLogMap[u.userId] ? `<t:${Math.floor(msgLogMap[u.userId]/1000)}:d>` : "N/A";
             return `**[${i+1}]** ${u.tag} (joined: ${join})`;
         }).join("\n");
-        // Try to fit in Discord embed limits (max 4000 chars)
-        if (desc.length > 3800) {
-            desc = desc.slice(0, 3800) + `\n...and more! (Showing first ${users.length} users)`;
+
+        // Discord embed description max 4096, but reserve room just in case.
+        if (desc.length > 3900) {
+            desc = desc.slice(0, 3900) + `\n...and more! (Showing first ${users.length} users)`;
         }
         let embed = new EmbedBuilder()
             .setTitle("👥 All Users Seen")
@@ -1714,6 +1721,13 @@ return;
         await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
         return;
     }
+
+
+
+
+
+
+
 
 
 

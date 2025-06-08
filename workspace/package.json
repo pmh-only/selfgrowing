@@ -1,9 +1,9 @@
 {
-  "name": "discord-largebot",
+  "name": "discord-advanced-bot",
   "version": "1.0.0",
-  "description": "Large scale single file Discord.js bot with moderation, games, UX improvements, and persistence (sqlite + /data/).",
   "type": "module",
   "main": "main.mjs",
+  "description": "Advanced Discord.js bot with SQLite and FS in Docker Linux. Features: moderation, games, utils.",
   "scripts": {
     "start": "node main.mjs"
   },
@@ -12,20 +12,19 @@
     "sqlite3": "^5.1.7",
     "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0",
-    "node-fetch": "^3.4.1"
+    "node-fetch": "^3.3.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18"
   },
   "keywords": [
     "discord",
-    "discord.js",
-    "sqlite",
+    "discord-bot",
     "bot",
-    "moderation",
-    "games",
-    "single-file"
+    "sqlite",
+    "fs",
+    "docker"
   ],
-  "author": "yourname",
+  "author": "Your Name",
   "license": "MIT"
 }
