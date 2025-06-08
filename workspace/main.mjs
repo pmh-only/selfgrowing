@@ -418,6 +418,10 @@ const contextCommands = [
     const commands = [
         // NEW FEATURE: /remindersclear command for clearing all your reminders
         {
+            name: 'archive',
+            description: 'Export the last 50 public messages as a text file attachment.'
+        },
+        {
             name: 'upvotes',
             description: 'Show the most upvoted messages in the channel!'
         },
@@ -425,6 +429,7 @@ const contextCommands = [
             name: 'remindersclear',
             description: 'Remove all your pending reminders at once (UX quick clean).'
         },
+
     // --- ADDITIONAL FEATURE: REPORT from context menu (register missing) ---
     {
         name: 'report',
@@ -445,10 +450,8 @@ const contextCommands = [
     },
 
     // --- ADDITIONAL FEATURE: MESSAGE ARCHIVE COMMAND ---
-    {
-        name: "archive",
-        description: "Download the last 50 public messages as a text file." 
-    },
+    // moved registration up for consistency
+
     // --- ADDITIONAL FEATURE: REMINDER EXPORT IMPORT ---
     {
         name: "reminderexport",
@@ -2405,6 +2408,37 @@ return;
         });
         return;
     }
+
+    // --- ADDITIONAL FEATURE: ARCHIVE COMMAND (export last 50 messages as file) ---
+    if (interaction.isChatInputCommand && interaction.commandName === "archive") {
+        try {
+            // Get last 50 messages from message_logs
+            const rows = await db.all("SELECT username, content, createdAt FROM message_logs ORDER BY createdAt DESC LIMIT 50");
+            if (!rows.length) {
+                await interaction.reply({ content: "No messages found to archive!", allowedMentions: { parse: [] } });
+                return;
+            }
+            const lines = rows.reverse().map(r =>
+                `[${new Date(r.createdAt).toLocaleString()}] [${r.username||"-"}]: ${r.content.replace(/\n/g," ")}`
+            );
+            const buffer = Buffer.from(lines.join("\n"), "utf8");
+            // Save copy file into /data/ for demo trace/debug as well (timestamped filename)
+            try {
+                await fs.writeFile(DATA_DIR + `archive_${Date.now()}.txt`, lines.join("\n"));
+            } catch {}
+            await interaction.reply({
+                content: "📄 Last 50 public messages attached.",
+                files: [
+                    { attachment: buffer, name: "archive_messages.txt" }
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({ content: "Failed to archive messages.", allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
     if (interaction.isChatInputCommand && interaction.commandName === "reminderimport") {
         // Import reminders from pasted JSON array
         let jsonTxt = interaction.options.getString("json");
