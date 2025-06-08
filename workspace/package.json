@@ -1,20 +1,33 @@
 {
-  "name": "discord-largebot",
+  "name": "discord-admin-funbot",
   "version": "1.0.0",
-  "description": "A large-scale Discord bot using discord.js, sqlite, and advanced slash commands.",
+  "description": "Large scale Discord.js bot with slash commands, moderation, games, and productivity tools",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.13.0",
+    "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.31.0",
+    "humanize-duration": "^3.29.0",
+    "fs-extra": "^11.2.0",
     "node-fetch": "^3.3.2"
   },
   "engines": {
-    "node": ">=18.0"
-  }
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "admin",
+    "fun",
+    "slash",
+    "games",
+    "moderation",
+    "sqlite"
+  ],
+  "author": "YourName",
+  "license": "MIT"
 }
