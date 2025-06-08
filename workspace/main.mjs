@@ -2732,6 +2732,20 @@ return;
                 if (levels.length) {
                     embed.addFields({name:"Level up history",value: levels.slice(-3).reverse().map(l=>`Level **${l.level}** at <t:${Math.floor(l.at/1000)}:f>`).join("\n") });
                 }
+                // Additional Feature: Show per-user XP graph (last 10 messages, XP simulated)
+                let showGraph = allMsgs.length >= 2;
+                if (showGraph) {
+                    // Simulate XP over last 10 messages
+                    let xps = [];
+                    let xp = 0;
+                    for (let i = allMsgs.length - 10; i < allMsgs.length; ++i) {
+                        if(i >= 0){
+                            xp += 4; // as above
+                            xps.push(xp);
+                        }
+                    }
+                    embed.addFields({name: "Last 10 msg XP (simulated)", value: xps.map((v,i)=>`Msg ${i+1}: ${v}xp`).join(" · ")});
+                }
                 await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
             }
         } catch(e) {
@@ -2739,6 +2753,7 @@ return;
         }
         return;
     }
+
 
     // --- ADDITIONAL FEATURE: PIN MESSAGE IN CHANNEL ---
     if (interaction.isChatInputCommand() && interaction.commandName === "pin") {
