@@ -1627,6 +1627,45 @@ return;
         return;
     }
 
+    // --- ADDITIONAL FEATURE: USERLIST ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "userlist") {
+        // Fetch all users from user_tags table
+        let users = [];
+        try {
+            users = await db.all("SELECT userId, tag, updatedAt FROM user_tags ORDER BY updatedAt DESC");
+        } catch {}
+        if (!users.length) {
+            await interaction.reply({ content: "No user data recorded yet.", allowedMentions: { parse: [] } });
+            return;
+        }
+        // Try to grab join date from message_logs (oldest message timestamp per user)
+        let msgLogMap = {};
+        try {
+            const logs = await db.all("SELECT userId, MIN(createdAt) as minTs FROM message_logs GROUP BY userId");
+            for (const row of logs) {
+                msgLogMap[row.userId] = row.minTs;
+            }
+        } catch {}
+
+        // Compose description
+        let desc = users.map((u,i) => {
+            let join = msgLogMap[u.userId] ? `<t:${Math.floor(msgLogMap[u.userId]/1000)}:d>` : "N/A";
+            return `**[${i+1}]** ${u.tag} (joined: ${join})`;
+        }).join("\n");
+        // Try to fit in Discord embed limits (max 4000 chars)
+        if (desc.length > 3800) {
+            desc = desc.slice(0, 3800) + `\n...and more! (Showing first ${users.length} users)`;
+        }
+        let embed = new EmbedBuilder()
+            .setTitle("👥 All Users Seen")
+            .setDescription(desc)
+            .setFooter({ text: "User info updated on message/chat." })
+            .setColor(0xa7f3d0);
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
+
+
 
 
 

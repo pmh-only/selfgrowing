@@ -1,22 +1,19 @@
 {
-  "name": "public-discord-bot",
+  "name": "discord-bot-advanced",
   "version": "1.0.0",
+  "description": "A large-scale Discord bot with advanced features using discord.js, sqlite, and persistent file storage.",
   "type": "module",
-  "description": "Large scale Discord.js bot with advanced UX and persistence features",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
-  "dependencies": {
-    "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
-    "sqlite": "^5.1.1",
-    "node-fetch": "^3.3.2",
-    "humanize-duration": "^3.29.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "author": "YourName",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.13.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6",
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^3.3.2"
+  }
 }
