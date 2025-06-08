@@ -103,6 +103,111 @@ try {
             await migratePinnedToTodo();
         } catch {}
     }
+
+
+
+
+
+
+
+
+
+    // --- BUTTON HANDLER: GUESSGAME "SUBMIT GUESS" ---
+    if (interaction.isButton && interaction.isButton() && interaction.customId === "guessgame_guess_btn") {
+        // Open a modal for user input
+        const modal = new ModalBuilder()
+            .setCustomId('guessgame_guess_modal')
+            .setTitle('Submit Your Guess!')
+            .addComponents(
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('guess_value')
+                        .setLabel('Your Guess (1-100)')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(true)
+                        .setPlaceholder('Enter a number from 1 to 100')
+                )
+            );
+        await interaction.showModal(modal);
+        return;
+    }
+
+    // --- MODAL HANDLER: GUESSGAME_GUESS_MODAL ---
+    if (interaction.isModalSubmit && interaction.isModalSubmit() && interaction.customId === "guessgame_guess_modal") {
+        // Get game state
+        if (!client._activeGuessGame || !client._activeGuessGame[CHANNEL_ID] || !client._activeGuessGame[CHANNEL_ID].active) {
+            await interaction.reply({ content: "There is no active guess game right now!", allowedMentions: { parse: [] } });
+            return;
+        }
+        // Process guess
+        const rawGuess = interaction.fields.getTextInputValue('guess_value');
+        let guess = Number(rawGuess);
+        if (isNaN(guess) || guess < 1 || guess > 100) {
+            await interaction.reply({ content: "Please enter a number between 1 and 100.", allowedMentions: { parse: [] } });
+            return;
+        }
+        let game = client._activeGuessGame[CHANNEL_ID];
+        // Prevent duplicate guess from same user in a row
+        const prevGuess = game.guesses[game.guesses.length-1];
+        if (prevGuess && prevGuess.userId === interaction.user.id && prevGuess.guess === guess) {
+            await interaction.reply({ content: "You just guessed that number. Try a different guess!", allowedMentions: { parse: [] } })
+            return;
+        }
+        game.guesses.push({ userId: interaction.user.id, guess, ts: Date.now() });
+        let uname = interaction.user.username;
+        if (guess === game.answer) {
+            game.active = false;
+            // Announce winner publicly
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            await chan.send({ content: `🎉 ${uname} guessed the correct number **${game.answer}**!`, allowedMentions: { parse: [] } });
+            // Save leaderboard data for future /guessleaderboard (bonus)
+            let lb = [];
+            try { lb = await readJSONFile("guessgame_leaderboard.json", []); } catch {}
+            let idx = lb.findIndex(x=>x.userId===interaction.user.id);
+            if (idx<0) lb.push({userId:interaction.user.id, wins:1});
+            else lb[idx].wins++;
+            await saveJSONFile("guessgame_leaderboard.json", lb);
+            await interaction.reply({ content: `You got it! The answer was **${game.answer}**.`, allowedMentions: { parse: [] } });
+        } else {
+            let diff = Math.abs(guess - game.answer);
+            let hint = "";
+            if (diff <= 2) hint = "🔥 Almost there!";
+            else if (guess < game.answer) hint = "Try higher ⬆️";
+            else if (guess > game.answer) hint = "Try lower ⬇️";
+            await interaction.reply({ content: `Incorrect! ${hint}`, allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
+    // --- SLASH: GUESSLEADERBOARD ---
+    if (interaction.isChatInputCommand && interaction.commandName === "guessleaderboard") {
+        let lb = [];
+        try { lb = await readJSONFile("guessgame_leaderboard.json", []); } catch {}
+        if (!lb.length) {
+            await interaction.reply({ content: "No one has won the guessing game yet! Use `/playguessgame` to start.", allowedMentions: { parse: [] } });
+            return;
+        }
+        // Sort by wins
+        lb = lb.sort((a, b) => b.wins - a.wins);
+        // Get usernames
+        let desc = [];
+        for (let i = 0; i < Math.min(5, lb.length); ++i) {
+            let it = lb[i];
+            let uname = it.userId;
+            try {
+                let u = await client.users.fetch(it.userId);
+                uname = u.username;
+            } catch {}
+            desc.push(`#${i + 1}: ${uname} — ${it.wins} win${it.wins === 1 ? "" : "s"}`);
+        }
+        const embed = new EmbedBuilder()
+            .setTitle("Number Guessing Game Leaderboard")
+            .setDescription(desc.join('\n'))
+            .setColor(0x89d2dc);
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
+
 } catch {}
 
 
@@ -352,9 +457,6 @@ const client = new Client({
 });
 
 
-// --- Login ---
-await client.login(TOKEN);
-
 /*
 New UX/features added in this SEARCH/REPLACE update:
 // UX/features added in this SEARCH/REPLACE update:
@@ -371,8 +473,14 @@ New UX/features added in this SEARCH/REPLACE update:
 // - /roll: Roll standard dice (e.g. /roll 1d6, /roll 2d12+3 etc), with math parsing and result explanation.
 // 
 // ## (End of changelog)
-
+//
+// === [ADDED FEATURE]: Fun Number Guessing Game
+// - /playguessgame: Start a public number guessing game for everyone. Users click 'Submit Guess', input number 1-100 in modal.
+// - Interactive, leaderboard tracked in /guessleaderboard. No mentions.
+//
 */
+
+
 
 
 import path from 'path';
@@ -423,6 +531,15 @@ const contextCommands = [
 // --- Slash commands registration ---
     // [FEATURE] Add /feedback and /feedbacklist slash commands for public feedback board.
     const commands = [
+        // [NEW FEATURE]: /playguessgame (public number guessing game)
+        {
+            name: 'playguessgame',
+            description: 'Start a public number guessing game for everyone (guess 1–100, leaderboard tracked).'
+        },
+        {
+            name: 'guessleaderboard',
+            description: 'Show wins leaderboard for the number guessing game.'
+        },
         // NEW FEATURE: /remindersclear command for clearing all your reminders
         {
             name: 'archive',
@@ -491,6 +608,7 @@ const contextCommands = [
     },
     // ... previous commands ...
     // [NEW FEATURE REGISTER]: /recent for fetching last 10 messages
+
 
 
 
@@ -2858,6 +2976,7 @@ return;
     if (interaction.isChatInputCommand() && interaction.commandName === 'dicestreak') {
         // Show longest dice roll streaks (consecutive days with any roll) for all users
         try {
+
             let histAll = [];
             try { histAll = await readJSONFile("roll_history.json", []); } catch {}
             if (!histAll.length) {
@@ -2915,10 +3034,54 @@ return;
     // --- SLASH: ROLL ---
 // UX improvement: more robust/clear error for empty input; add special "roll for initiative" preset
 
+    // --- SLASH: PLAYGUESSGAME ---
+    if (interaction.isChatInputCommand && interaction.commandName === "playguessgame") {
+        // Fun public number guessing game
+        // Store one game per channel for demo
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({content:"Guess game is public. Use in main channel.", allowedMentions: { parse: [] }});
+            return;
+        }
+        if (!client._activeGuessGame) client._activeGuessGame = {};
+        // Don't allow more than one at a time
+        if (client._activeGuessGame[CHANNEL_ID] && client._activeGuessGame[CHANNEL_ID].active) {
+            await interaction.reply({content: "A guessing game is already running! Wait for it to finish.", allowedMentions: { parse: [] }});
+            return;
+        }
+        // Pick a random number between 1 and 100
+        const answer = Math.floor(Math.random()*100)+1;
+        client._activeGuessGame[CHANNEL_ID] = {
+            answer,
+            guesses: [], // {userId, guess, ts}
+            active: true,
+            start: Date.now()
+        };
+        const embed = new EmbedBuilder()
+            .setTitle("🔢 Number Guessing Game!")
+            .setDescription(`I'm thinking of a number **between 1 and 100**. Try to guess it! Submit your guess below (first to get it wins!).`)
+            .setColor(0xbde0fe)
+            .setFooter({text: "Use the button to enter your guess!"});
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('guessgame_guess_btn').setLabel('Submit Guess').setStyle(ButtonStyle.Primary)
+        );
+        await interaction.reply({ embeds: [embed], components: [row], allowedMentions: { parse: [] } });
+        // Set a 3 minute timer to auto-end game if not solved
+        setTimeout(async () => {
+            let game = client._activeGuessGame[CHANNEL_ID];
+            if (game && game.active) {
+                game.active = false;
+                const chan = await client.channels.fetch(CHANNEL_ID);
+                await chan.send({ content: `⏲️ Guessing game ended! The correct answer was **${game.answer}**.`, allowedMentions: { parse: [] } });
+            }
+        }, 3*60*1000);
+        return;
+    }
+
     // --- [ADDITIONAL FEATURE: CALC SLASH COMMAND IMPLEMENTATION] ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'calc') {
 
         // Calculate a user-provided math expression safely
+
         const expression = interaction.options.getString('expression');
         // Input sanitization: only allow numbers, + - * / ( ) . ^ and spaces
         if (!/^[\d\s\+\-\*\/\(\)\.\^]+$/.test(expression)) {
