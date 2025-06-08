@@ -1,19 +1,32 @@
 {
-  "name": "discordjs-private-productivity-bot",
+  "name": "discordjs-largebot-singlefile",
   "version": "1.0.0",
-  "description": "A feature-rich Discord bot for productivity, moderation, and fun, using discord.js v14+, SQLite, and modern Node.js.",
+  "description": "A large-scale Discord bot (single file, ESM) for advanced moderation, games, tools, and content features.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
-  "author": "",
-  "license": "MIT",
   "dependencies": {
-    "discord.js": "^14.13.0",
-    "sqlite3": "^5.1.4",
+    "discord.js": "^14.14.1",
+    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "node-fetch": "^3.3.2",
-    "humanize-duration": "^3.29.0"
-  }
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "discord.js",
+    "sqlite",
+    "moderation",
+    "games",
+    "utilities",
+    "single-file"
+  ],
+  "license": "MIT",
+  "author": "YourName <your@email.com>"
 }

@@ -362,8 +362,8 @@ const contextCommands = [
 
 
 // --- Slash commands registration ---
-// [FEATURE] Add /feedback and /feedbacklist slash commands for public feedback board.
-const commands = [
+    // [FEATURE] Add /feedback and /feedbacklist slash commands for public feedback board.
+    const commands = [
     // ... previous commands ...
     // --- ADDITIONAL FEATURE: REMINDER REMOVE COMMAND ---
     {
@@ -373,6 +373,12 @@ const commands = [
             { name: 'number', type: 4, description: 'Reminder number as seen in /reminders.', required: true }
         ]
     },
+    // --- NEW FEATURE: PUBLIC USER REACTION HISTORY (/myreactions) ---
+    {
+        name: "myreactions",
+        description: "Show your last 10 message reactions (public, upvote/downvote/other)."
+    },
+
     // --- ADDITIONAL FEATURE: VIEW REPORTS (MODERATION) ---
     {
         name: "reports",
@@ -858,6 +864,42 @@ const eightBallResponses = [
  * Also: fix interaction.channel.type undefined bug for system/app_home/other types. DMs are type === 1 or interaction.channel is null (DM), text/guild channels differ.
  */
 client.on('interactionCreate', async interaction => {
+
+    // --- NEW FEATURE: /myreactions ---
+
+    if (interaction.isChatInputCommand && interaction.commandName === "myreactions") {
+        // Show messages the user has reacted to (+ what type), most recent 10, as a public "reaction history"
+        let rows = await db.all(`
+            SELECT messageId, reaction, ts FROM reactions
+            WHERE userId=?
+            ORDER BY ts DESC
+            LIMIT 10
+        `, interaction.user.id);
+        if (!rows || !rows.length) {
+            await interaction.reply({content: "You haven't reacted to any messages yet!", allowedMentions: { parse: [] }});
+            return;
+        }
+        let lines = [];
+        const chan = await client.channels.fetch(CHANNEL_ID);
+        for (const row of rows) {
+            let msgContent = "";
+            let jumplink = "";
+            try {
+                let msg = await chan.messages.fetch(row.messageId);
+                msgContent = msg.content ? msg.content.slice(0,60) : "[no content]";
+                jumplink = msg.url ? `[jump](${msg.url})` : "";
+            } catch {
+                msgContent = "[deleted/unavailable]";
+            }
+            lines.push(`${row.reaction} on "${msgContent}" ${jumplink} (<t:${Math.floor(row.ts/1000)}:R>)`);
+        }
+        let embed = new EmbedBuilder()
+            .setTitle("🛠️ Your Most Recent Reactions")
+            .setDescription(lines.join("\n"))
+            .setColor(0xdfa2d0);
+        await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
+        return;
+    }
     // --- [FEATURE] FEEDBACK BOARD ---
     if (interaction.isChatInputCommand && interaction.commandName === "feedback") {
         // Post public feedback (anyone can submit, upvote/downvote)
@@ -866,6 +908,7 @@ client.on('interactionCreate', async interaction => {
             await interaction.reply({content: "Feedback too short. Please give a longer comment!", allowedMentions: { parse: [] }});
             return;
         }
+
         if (fbText.length > 500) fbText = fbText.slice(0,500);
         let uname;
         try {
