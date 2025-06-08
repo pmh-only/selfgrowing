@@ -1889,6 +1889,29 @@ return;
         return;
     }
 
+    // --- SLASH: QUOTELEADERBOARD ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "quoteleaderboard") {
+        // Show top quoted users (author_tag or q.user.tag) in /quotes.json
+        const quotes = await readJSONFile("quotes.json", []);
+        if (!quotes.length) return void interaction.reply({ content: "No quotes saved yet.", allowedMentions: { parse: [] } });
+        // Tally: tag or author_tag
+        let counts = {};
+        for (const q of quotes) {
+            let tag = q.user?.tag || q.author_tag || "Unknown";
+            counts[tag] = (counts[tag] || 0) + 1;
+        }
+        let sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 10);
+        let desc = sorted.map(([tag, n], i) => `#${i+1}: **${tag}** — ${n} quote${n===1?"":"s"}`).join("\n");
+        let embed = new EmbedBuilder()
+            .setTitle("🏆 Quote Leaderboard")
+            .setDescription(desc)
+            .setColor(0xffc300);
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
+
+
+
 
 
     // --- SLASH: QUOTEADD (NEW PUBLIC ADD QUOTE FEATURE) ---

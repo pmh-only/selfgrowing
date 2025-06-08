@@ -1,29 +1,20 @@
 {
-  "name": "discord-channelbot",
-  "version": "1.0.0",
+  "name": "private-discordjs-bot",
   "type": "module",
+  "version": "1.0.0",
+  "description": "A large scale private Discord bot with moderation, games, leaderboards, and productivity tools.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
-  "dependencies": {
-    "discord.js": "^14.13.0",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.29.0",
-    "node-fetch": "^3.3.2"
-  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18"
   },
-  "keywords": [
-    "discord",
-    "bot",
-    "moderation",
-    "channel",
-    "slash-commands",
-    "fun"
-  ],
-  "author": "private",
-  "license": "MIT"
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "sqlite3": "^5.1.6",
+    "sqlite": "^5.1.1",
+    "node-fetch": "^3.3.2",
+    "humanize-duration": "^3.29.0"
+  }
 }
