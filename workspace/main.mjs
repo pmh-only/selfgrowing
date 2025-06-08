@@ -3565,8 +3565,29 @@ client.on('interactionCreate', async interaction => {
         });
         // Add actual unicode reaction for quick visual feedback
         try { await msg.react(reaction); } catch {}
+
+        // --- Additional Feature: Fun Extra: "Reaction Battle" Mini-Game ---
+        // If both thumbs up/down reach threshold for a message, let the message become the "battleground" -- users can continue toggling as a game, with a button!
+        // Example: If up+down >= 10
+        if ((ups[0].n + downs[0].n) >= 10) {
+            // Only post game button once (by checking for a previous bot reply)
+            let chan = await client.channels.fetch(CHANNEL_ID);
+            let recentMsgs = await chan.messages.fetch({limit: 10});
+            let alreadyBattle = recentMsgs.find(m => m.author.id === client.user.id && m.content && m.content.includes(`[Reaction Battle] for message ${msg.id}`));
+            if (!alreadyBattle) {
+                const battleRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`reaction_battle_${msg.id}`).setLabel("Start Reaction Battle!").setStyle(ButtonStyle.Secondary)
+                );
+                await chan.send({
+                    content: `[Reaction Battle] for message ${msg.id}: This message sparked a battle! Click to keep the tally going!`,
+                    components: [battleRow],
+                    allowedMentions: { parse: [] }
+                });
+            }
+        }
         return;
     }
+
 
 
 
@@ -3600,6 +3621,49 @@ client.on('interactionCreate', async interaction => {
 
         return;
     }
+
+    // --- Additional Feature: "Reaction Battle" (toggle game for highly reacted messages) ---
+    if (interaction.isButton() && interaction.customId.startsWith("reaction_battle_")) {
+        let mid = interaction.customId.replace("reaction_battle_","");
+        // Each click toggles between upvote and downvote for the user, and posts new totals!
+        // Find last user's reaction for this message, alternate (so if thumb up, next is down, etc)
+        let lastReact = await db.get(
+            `SELECT reaction FROM reactions WHERE messageId=? AND userId=? ORDER BY ts DESC LIMIT 1`,
+            mid, interaction.user.id
+        );
+        let nextReact = "👍";
+        if (lastReact && lastReact.reaction === "👍") nextReact = "👎";
+        // Save new reaction
+        try {
+            await db.run(`
+                INSERT INTO reactions(messageId, userId, reaction, ts)
+                VALUES (?,?,?,?)
+            `, mid, interaction.user.id, nextReact, Date.now());
+        } catch (e) {
+            await db.run(
+                `UPDATE reactions SET reaction=?, ts=? WHERE messageId=? AND userId=?`,
+                nextReact, Date.now(), mid, interaction.user.id
+            );
+        }
+        // Re-count
+        let ups = await db.get(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='👍'`, mid);
+        let downs = await db.get(`SELECT COUNT(*) as n FROM reactions WHERE messageId=? AND reaction='👎'`, mid);
+        let chan = await client.channels.fetch(CHANNEL_ID);
+        let content = "";
+        try {
+            let msg = await chan.messages.fetch(mid);
+            let preview = msg.content.slice(0, 80);
+            content = `**[Reaction Battle]**\n"${preview}"\n👍 **${ups.n}** | 👎 **${downs.n}**\n${ups.n>downs.n ? "👍 Team winning!" : (downs.n>ups.n ? "👎 Team winning!" : "It's a tie!")}`;
+        } catch {
+            content = `**[Reaction Battle]**\nMessageID: ${mid}\n👍 **${ups.n}** | 👎 **${downs.n}**`;
+        }
+        await interaction.reply({
+            content: content,
+            allowedMentions: { parse: [] }
+        });
+        return;
+    }
+
 
 
     // NEW FEATURE: Upvote/Downvote Leaderboard via message context menu button

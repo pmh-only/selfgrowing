@@ -1,22 +1,22 @@
 {
-  "name": "discord-utility-bot",
-  "type": "module",
+  "name": "discord-bot-private",
   "version": "1.0.0",
-  "description": "A large-scale Discord bot with public slash commands for administration, moderation, fun, and user utilities.",
+  "description": "A large-scale Discord.js bot using slash commands, SQLite and public user data, tailored for a single-channel, single-guild Docker environment.",
+  "type": "module",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
+    "sqlite": "^5.1.1",
     "humanize-duration": "^3.29.0",
-    "node-fetch": "^2.6.12"
+    "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "author": "",
-  "license": "MIT"
+  "license": "UNLICENSED"
 }
