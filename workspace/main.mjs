@@ -2940,10 +2940,13 @@ return;
                   .setTitle("🪙 Coin Flip")
                   .setDescription(`The coin landed on **${result}**!`)
                   .setColor(result === "Heads" ? 0xfbff00 : 0x525252)
-            ]
+            ],
+            allowedMentions: { parse: [] }
         });
         return;
     }
+
+
 
 
     
