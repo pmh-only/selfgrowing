@@ -421,6 +421,15 @@ const contextCommands = [
             description: 'Remove all your pending reminders at once (UX quick clean).'
         },
 
+    // --- ADDITIONAL FEATURE: PER-USER SETTINGS (Mute XP) ---
+    {
+        name: "settings_user",
+        description: "Configure your personal settings (mute XP, notification preferences, etc).",
+        options: [
+            { name: "mute_xp", type: 5, description: "Temporarily mute your XP gain", required: false },
+            { name: "clear_xp_mute", type: 5, description: "Clear your XP mute if set", required: false }
+        ]
+    },
 
     // --- ADDITIONAL FEATURE: MESSAGE PINNED LIST SLASH (register missing) ---
     {
@@ -429,6 +438,8 @@ const contextCommands = [
     },
     // ... previous commands ...
     // [NEW FEATURE REGISTER]: /recent for fetching last 10 messages
+
+
 
 
         // NEW FEATURE: /gg and /ggleaderboard slash commands registration
@@ -953,6 +964,39 @@ const eightBallResponses = [
  */
 client.on('interactionCreate', async interaction => {
     
+    // --- ADDITIONAL FEATURE: /settings_user PER-USER SETTINGS (Mute XP) ---
+    if (interaction.isChatInputCommand && interaction.commandName === 'settings_user') {
+        let mutedColumnExists = false;
+        // Ensure user_settings table exists with mute_xp
+        try {
+            await db.run(`CREATE TABLE IF NOT EXISTS user_settings (
+                userId TEXT PRIMARY KEY,
+                mute_xp INTEGER NOT NULL DEFAULT 0,
+                updatedAt INTEGER NOT NULL DEFAULT 0
+            )`);
+            mutedColumnExists = true;
+        } catch {}
+        // Set or clear mute_xp
+        if (interaction.options.getBoolean && interaction.options.getBoolean('mute_xp') === true) {
+            await db.run('INSERT OR REPLACE INTO user_settings(userId, mute_xp, updatedAt) VALUES (?,?,?)', interaction.user.id, 1, Date.now());
+            await interaction.reply({ content: "🔇 You have muted your XP gain! You will not receive XP for messages until you clear this.", allowedMentions: { parse: [] } });
+            return;
+        }
+        if (interaction.options.getBoolean && interaction.options.getBoolean('clear_xp_mute') === true) {
+            await db.run('INSERT OR REPLACE INTO user_settings(userId, mute_xp, updatedAt) VALUES (?,?,0)', interaction.user.id, 0, Date.now());
+            await interaction.reply({ content: "✅ Your XP mute has been cleared! You will receive XP for messages again.", allowedMentions: { parse: [] } });
+            return;
+        }
+        // Status display
+        let settingsRec = await db.get('SELECT mute_xp FROM user_settings WHERE userId=?', interaction.user.id);
+        if (settingsRec && settingsRec.mute_xp) {
+            await interaction.reply({ content: "Your XP gain is currently **muted**. Use this command with `clear_xp_mute` to restore.", allowedMentions: { parse: [] } });
+        } else {
+            await interaction.reply({ content: "Your XP gain is currently **active**.", allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
     // --- GG COMMAND HANDLERS ---
     if (interaction.isChatInputCommand && (interaction.commandName === "gg" || interaction.commandName === "ggleaderboard")) {
         // Ensure table
@@ -994,6 +1038,7 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
 
     // GG LEADERBOARD context menu: right-click
     if (interaction.isUserContextMenuCommand?.() && interaction.commandName === "GG Leaderboard") {
@@ -3502,7 +3547,13 @@ client.on('messageCreate', async msg => {
     if (msg.guild) {
         // XP: 3-10/message, 1 min cooldown unless XP muted for this user (content moderation improvement)
         let muted = null;
-        try { muted = await db.get("SELECT 1 FROM warnings WHERE userId=? AND reason LIKE '%XP MUTE%'", msg.author.id); } catch {}
+        // First, check user_settings table for muted XP state:
+        try {
+            let userSetting = await db.get("SELECT mute_xp FROM user_settings WHERE userId=?", msg.author.id);
+            if (userSetting && userSetting.mute_xp) muted = true;
+        } catch {}
+        // If no mute detected above, fallback to legacy warnings table check:
+        if (!muted) try { muted = await db.get("SELECT 1 FROM warnings WHERE userId=? AND reason LIKE '%XP MUTE%'", msg.author.id); } catch {}
         if (!muted) {
             const row = await db.get('SELECT xp, level FROM xp WHERE userId=?', msg.author.id) || {xp:0,level:0};
             const lastKey = `lastxp_${msg.author.id}`;
@@ -3519,6 +3570,7 @@ client.on('messageCreate', async msg => {
 
             }
         }
+
         // Basic moderation: block bad words, allow config of blocked words in /data/blocked_words.json
         let dynamicBadWords = [];
         try { dynamicBadWords = await readJSONFile("blocked_words.json", []); } catch {}

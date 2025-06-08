@@ -1,31 +1,19 @@
 {
-  "name": "discord-largebot",
+  "name": "discord-bot",
   "version": "1.0.0",
-  "description": "Large scale Discord.js bot with advanced features, moderation, fun games, XP, etc.",
-  "type": "module",
+  "description": "A feature-rich Discord bot with fun, productivity, and moderation tools for a single channel.",
   "main": "main.mjs",
+  "type": "module",
   "scripts": {
     "start": "node main.mjs"
   },
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.29.0",
-    "node-fetch": "^3.3.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "discord",
-    "bot",
-    "discordjs",
-    "moderation",
-    "sqlite",
-    "fun",
-    "admin"
-  ],
-  "author": "OpenAI GPT-4",
-  "license": "MIT"
+    "node-fetch": "^3.3.2",
+    "humanize-duration": "^3.29.0"
+  }
 }
