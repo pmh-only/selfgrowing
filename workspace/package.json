@@ -1,22 +1,29 @@
 {
-  "name": "discord-feature-bot",
+  "name": "discord-js-largebot",
   "version": "1.0.0",
   "type": "module",
-  "description": "Large scale Discord.js bot with sqlite & feature-rich slash commands",
   "main": "main.mjs",
+  "description": "Large scale discord.js bot with slash commands and fun features",
   "scripts": {
-    "start": "NODE_ENV=production node main.mjs"
+    "start": "node main.mjs"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
+    "fs-extra": "^11.2.0",
     "humanize-duration": "^3.29.0",
     "node-fetch": "^3.3.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18"
   },
+  "keywords": [
+    "discord",
+    "bot",
+    "discord.js",
+    "sqlite"
+  ],
   "author": "",
   "license": "MIT"
 }

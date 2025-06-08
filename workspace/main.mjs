@@ -1568,6 +1568,54 @@ return;
         return;
     }
 
+    // --- SLASH: MEME ---
+    if (interaction.isChatInputCommand() && interaction.commandName === "meme") {
+        // Fetch a meme from an API, fallback to static list if API fails
+        let memeData = null;
+        let title = "";
+        let imageUrl = "";
+        let source = "";
+        let fallbackMemes = [
+            {
+                title: "Programmer Owl",
+                url: "https://i.kym-cdn.com/entries/icons/original/000/030/964/cover2.jpg",
+                source: "KYM"
+            },
+            {
+                title: "Math Lady",
+                url: "https://i.imgur.com/4M7IWwP.jpg",
+                source: "imgur"
+            },
+            {
+                title: "Distracted Boyfriend",
+                url: "https://i.imgur.com/SHlV9iO.jpg",
+                source: "imgur"
+            }
+        ];
+        try {
+            // Try to fetch from Reddit's meme API or similar free endpoint
+            const resp = await fetch("https://meme-api.com/gimme");
+            memeData = await resp.json();
+            title = memeData.title;
+            imageUrl = memeData.url;
+            source = memeData.postLink;
+        } catch (e) {
+            // Use fallback
+            let pick = fallbackMemes[Math.floor(Math.random()*fallbackMemes.length)];
+            title = pick.title;
+            imageUrl = pick.url;
+            source = pick.source;
+        }
+        const embed = new EmbedBuilder()
+            .setTitle(`🖼️ Meme${title ? ": " + title : ""}`)
+            .setDescription(source ? `Source: ${source}` : "")
+            .setImage(imageUrl)
+            .setColor(0xf5b041);
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
+
+
     // --- SLASH: FUNFACTS (recent posts leaderboard) ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'funfacts') {
         // Show last 6 facts from /data/fun_facts_history.json
