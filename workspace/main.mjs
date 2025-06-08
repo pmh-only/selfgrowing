@@ -688,9 +688,12 @@ const contextCommands = [
             { name:'edit', type:1, description:"Edit a to-do", options:[
                 { name:'number', type:4, description:"To-do item number", required:true },
                 { name:'content', type:3, description:"New content", required:true }
-            ]}
+            ]},
+            // NEW FEATURE: Bulk complete all to-dos
+            { name:'completeall', type:1, description:"Mark all to-dos as completed" }
         ]
     },
+
 
 
     {
@@ -2251,6 +2254,17 @@ return;
             await interaction.reply({content: `✏️ To-Do item #${idx} updated.\nBefore: "${oldContent}"\nAfter: "${newContent}"`, allowedMentions: { parse: [] }});
 
         }
+        // NEW: "Complete All" (bonus - bulk mark as done, only if some undone)
+        else if (sub === "completeall") {
+            // Set all public todos to done = 1
+            let updated = await db.run("UPDATE todo_entries SET done=1 WHERE done=0");
+            let count = updated.changes || 0;
+            if (count === 0) {
+                await interaction.reply({content:"All to-dos are already completed!", allowedMentions: { parse: [] } });
+            } else {
+                await interaction.reply({content:`✅ Marked ${count} to-dos as completed!`, allowedMentions: { parse: [] } });
+            }
+        }
         // NEW FEATURE: Add "Clear All Completed" for fast cleaning up finished items (public, admin/UX tool)
         // Check for "clearall" subcommand via manual trigger (to avoid modifying original to-do slash structure)
         else if (sub === "clearall") {
@@ -2265,6 +2279,7 @@ return;
         }
         return;
     }
+
 
 
 

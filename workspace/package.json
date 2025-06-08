@@ -1,6 +1,7 @@
 {
-  "name": "private-discordjs-bot",
+  "name": "discordjs-privatebot",
   "version": "1.0.0",
+  "description": "Large-scale single file Discord.js private bot with SQLite, fun and moderation features.",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -8,12 +9,22 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "humanize-duration": "^3.29.0",
-    "node-fetch": "^3.3.2"
+    "sqlite": "^5.1.1",
+    "node-fetch": "^3.3.2",
+    "humanize-duration": "^3.31.0"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "keywords": [
+    "discord",
+    "discordjs",
+    "sqlite",
+    "bot",
+    "private",
+    "single-file"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
 }
