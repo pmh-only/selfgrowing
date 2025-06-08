@@ -1,8 +1,8 @@
 {
-  "name": "discord-bot-private",
-  "version": "1.0.0",
-  "description": "A large-scale Discord.js bot using slash commands, SQLite and public user data, tailored for a single-channel, single-guild Docker environment.",
+  "name": "discordjs-allinone-bot",
   "type": "module",
+  "version": "1.0.0",
+  "description": "A large-scale Discord.js bot with moderation, productivity, and fun features. Supports SQLite and file data persistence.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
@@ -10,13 +10,22 @@
   "dependencies": {
     "discord.js": "^14.14.1",
     "sqlite3": "^5.1.6",
-    "sqlite": "^5.1.1",
-    "humanize-duration": "^3.29.0",
+    "sqlite": "5.1.1",
+    "humanize-duration": "^3.31.0",
     "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "author": "",
-  "license": "UNLICENSED"
+  "keywords": [
+    "discord",
+    "discord.js",
+    "bot",
+    "sqlite",
+    "fun",
+    "moderation",
+    "productivity"
+  ],
+  "author": "YourNameHere",
+  "license": "MIT"
 }

@@ -711,6 +711,13 @@ const contextCommands = [
         name: "rollstats",
         description: "Show leaderboard and fun stats for dice rolls"
     },
+    // --- NEW FEATURE: DICESTREAK ---
+    {
+        name: "dicestreak",
+        description: "Show top users with the best daily dice rolling streaks."
+    },
+
+
 
 
     // --- ADDITIONAL FEATURE: MESSAGE PINNER SLASH COMMAND REGISTRATION ---
@@ -1923,11 +1930,70 @@ return;
 
 
 
+    // --- SLASH: DICESTREAK ---
+    if (interaction.isChatInputCommand() && interaction.commandName === 'dicestreak') {
+        // Show longest dice roll streaks (consecutive days with any roll) for all users
+        try {
+            let histAll = [];
+            try { histAll = await readJSONFile("roll_history.json", []); } catch {}
+            if (!histAll.length) {
+                await interaction.reply({
+                    content: "No dice roll history yet!",
+                    allowedMentions: { parse: [] }
+                });
+                return;
+            }
+            // Compute for each userId: count max "consecutive days with roll"
+            let byUid = {};
+            for (let r of histAll) {
+                if (!byUid[r.userId]) byUid[r.userId] = [];
+                byUid[r.userId].push(r.at);
+            }
+            let streakStats = [];
+            for (let [uid, ats] of Object.entries(byUid)) {
+                let days = ats.map(x=>Math.floor(x/86400000));
+                days = [...new Set(days)].sort((a,b)=>a-b);
+                let maxStreak = 0, cur = 1;
+                for (let i=1;i<days.length;i++) {
+                    if (days[i] === days[i-1]+1) cur++;
+                    else cur = 1;
+                    if (cur>maxStreak) maxStreak = cur;
+                }
+                if (days.length) maxStreak = Math.max(maxStreak, 1);
+                streakStats.push({ uid, maxStreak, days: days.length });
+            }
+            streakStats = streakStats.sort((a,b)=>b.maxStreak - a.maxStreak).slice(0, 10);
+            // Fetch usernames
+            for (let stat of streakStats) {
+                try {
+                    let user = await client.users.fetch(stat.uid);
+                    stat.uname = user?.username || stat.uid;
+                } catch { stat.uname = stat.uid; }
+            }
+            let desc = streakStats.map((s, i)=>
+                `#${i+1}: **${s.uname}** — Best streak: **${s.maxStreak} day${s.maxStreak===1?'':'s'}**, Total active days: ${s.days}`
+            ).join("\n");
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🎲 Dice Roll Streak Leaderboard")
+                        .setDescription("Top dice roll daily streaks across all users.\n\n" + desc)
+                        .setColor(0x81e6d9)
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({content: "Failed to compute dice streaks.", allowedMentions: { parse: [] }});
+        }
+        return;
+    }
+
     // --- SLASH: ROLL ---
 // UX improvement: more robust/clear error for empty input; add special "roll for initiative" preset
 
     // --- [ADDITIONAL FEATURE: CALC SLASH COMMAND IMPLEMENTATION] ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'calc') {
+
         // Calculate a user-provided math expression safely
         const expression = interaction.options.getString('expression');
         // Input sanitization: only allow numbers, + - * / ( ) . ^ and spaces
