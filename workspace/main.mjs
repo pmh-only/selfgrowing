@@ -580,6 +580,15 @@ const contextCommands = [
             name: 'rps-stats',
             description: 'Show Rock Paper Scissors leaderboard & stats'
         },
+        // --- NEW FEATURE: REGISTER /quotesearch COMMAND FOR PUBLIC QUOTE SEARCH ---
+        {
+            name: "quotesearch",
+            description: "Search public quotes by author (username#tag or part)",
+            options: [
+                { name: "author", type: 3, description: "Username#tag (or partial)", required: true }
+            ]
+        },
+
         // --- NEW FEATURE: FEEDBACK BOARD ---
         {
             name: 'feedback',
@@ -2031,6 +2040,40 @@ return;
         await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
         return;
     }
+
+    // ---------- NEW FEATURE: PUBLIC QUOTE SEARCH BY AUTHOR ----------
+    // /quotesearch author: <tag-or-partial>
+    if (interaction.isChatInputCommand && interaction.commandName === "quotesearch") {
+        // Only allow in main channel for public display
+        if (!interaction.guild || interaction.channel.id !== CHANNEL_ID) {
+            await interaction.reply({content: "Use this command in the main channel only.", allowedMentions: { parse: [] }});
+            return;
+        }
+        const author = interaction.options.getString("author");
+        if (!author || author.length < 2) {
+            await interaction.reply({content: "Please provide at least 2 characters of the author to search.", allowedMentions: { parse: [] }});
+            return;
+        }
+        const quotes = await readJSONFile("quotes.json", []);
+        // Search by partial author tag (case-insensitive)
+        const results = quotes.filter(q => (q.user?.tag || q.author_tag || "").toLowerCase().includes(author.toLowerCase()));
+        if (!results.length) {
+            await interaction.reply({content: `No quotes found for author containing "${author}".`, allowedMentions: { parse: [] }});
+            return;
+        }
+        // Show at most 10 results
+        const view = results.slice(-10).reverse();
+        const embed = new EmbedBuilder()
+            .setTitle(`💬 Quotes by "${author}"`)
+            .setDescription(view.map((q, i) =>
+                `**[${i+1}]** "${q.content}"\n— ${q.user?.tag || q.author_tag || "Unknown"} (${q.category ? "#" + q.category : ""}) _<t:${Math.floor((q.timestamp||Date.now())/1000)}:f>_`
+            ).join("\n\n"))
+            .setColor(0xabc4ff)
+            .setFooter({ text: `Showing last ${view.length} quotes by author match` });
+        await interaction.reply({embeds: [embed], allowedMentions: { parse: [] }});
+        return;
+    }
+
 
 
 
