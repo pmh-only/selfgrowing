@@ -362,17 +362,28 @@ const contextCommands = [
 
 
 // --- Slash commands registration ---
-// [FEATURE] Add /feedback and /feedbacklist slash commands for public feedback board.
-    const commands = [
-        // ... previous commands ...
-        // --- ADDITIONAL FEATURE: REMINDER REMOVE COMMAND ---
-        {
-            name: 'reminderremove',
-            description: 'Remove a pending reminder by its number from your reminder list.',
-            options: [
-                { name: 'number', type: 4, description: 'Reminder number as seen in /reminders.', required: true }
-            ]
-        },
+ // [FEATURE] Add /feedback and /feedbacklist slash commands for public feedback board.
+ const commands = [
+     // ... previous commands ...
+     // --- ADDITIONAL FEATURE: REMINDER REMOVE COMMAND ---
+     {
+         name: 'reminderremove',
+         description: 'Remove a pending reminder by its number from your reminder list.',
+         options: [
+             { name: 'number', type: 4, description: 'Reminder number as seen in /reminders.', required: true }
+         ]
+     },
+     // --- ADDITIONAL FEATURE: VIEW REPORTS (MODERATION) ---
+     {
+         name: "reports",
+         description: "Show recent public message reports for moderation review"
+     },
+     // --- ADDITIONAL FEATURE: PUBLIC WARNING LOG (MODERATION) ---
+     {
+         name: "warns",
+         description: "Show the last 10 warnings issued (public, moderation log)"
+     },
+
         {
             name: 'note',
             description: 'Add/view/delete personal notes publicly in channel.',

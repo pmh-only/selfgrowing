@@ -1,31 +1,22 @@
 {
-  "name": "discord-private-bot",
-  "version": "1.0.0",
+  "name": "discord-utility-bot",
   "type": "module",
-  "description": "A large scale, single-file, slash-command Discord bot with persistent data for a single guild and channel.",
+  "version": "1.0.0",
+  "description": "A large-scale Discord bot with public slash commands for administration, moderation, fun, and user utilities.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
   "dependencies": {
-    "discord.js": "^14.13.0",
+    "discord.js": "^14.14.1",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
-    "fs-extra": "^11.2.0",
     "humanize-duration": "^3.29.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^2.6.12"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": [
-    "discord",
-    "bot",
-    "sqlite",
-    "slash-commands",
-    "single-channel",
-    "guild"
-  ],
-  "author": "Your Name",
+  "author": "",
   "license": "MIT"
 }
