@@ -1,20 +1,22 @@
 {
-  "name": "private-discordjs-bot",
-  "type": "module",
+  "name": "discordjs-largebot",
   "version": "1.0.0",
-  "description": "A large scale private Discord bot with moderation, games, leaderboards, and productivity tools.",
+  "type": "module",
+  "description": "A large scale Discord bot with a single main.mjs using sqlite, filesystem and advanced discord.js features.",
   "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs"
   },
-  "engines": {
-    "node": ">=18"
-  },
   "dependencies": {
-    "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.6",
+    "discord.js": "^14.13.0",
     "sqlite": "^5.1.1",
-    "node-fetch": "^3.3.2",
-    "humanize-duration": "^3.29.0"
-  }
+    "sqlite3": "^5.1.6",
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "",
+  "license": "ISC"
 }

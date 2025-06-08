@@ -444,6 +444,11 @@ const contextCommands = [
         ]
     },
 
+    // --- ADDITIONAL FEATURE: MESSAGE ARCHIVE COMMAND ---
+    {
+        name: "archive",
+        description: "Download the last 50 public messages as a text file." 
+    },
 
     // --- ADDITIONAL FEATURE: MESSAGE PINNED LIST SLASH (register missing) ---
     {
@@ -452,6 +457,10 @@ const contextCommands = [
     },
     // ... previous commands ...
     // [NEW FEATURE REGISTER]: /recent for fetching last 10 messages
+
+
+
+
 
 
 
