@@ -1555,6 +1555,30 @@ return;
         // Only keep last 20
         if (funHist.length > 20) funHist = funHist.slice(-20);
         await saveJSONFile("fun_facts_history.json", funHist);
+        // --- New Feature Begin ---
+        // After posting the fun fact, prompt the user to rate it using buttons
+        const rateRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('funfact_rate_5')
+                .setLabel('😍 5')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId('funfact_rate_4')
+                .setLabel('😃 4')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId('funfact_rate_3')
+                .setLabel('🙂 3')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('funfact_rate_2')
+                .setLabel('😐 2')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('funfact_rate_1')
+                .setLabel('🥱 1')
+                .setStyle(ButtonStyle.Danger)
+        );
         await interaction.reply({
             embeds: [
                 new EmbedBuilder()
@@ -1563,10 +1587,27 @@ return;
                   .setFooter({ text: `Shared by ${uname}` })
                   .setColor(0xfcba03)
             ],
+            components: [rateRow],
             allowedMentions: { parse: [] }
         });
+        // Write to fun facts ratings structure for retrieval and leaderboard
+        try {
+            let ffRatings = await readJSONFile("funfacts_ratings.json", []);
+            // Save as: {fact, by, at, ratings: [{userId, value}], id}
+            let id = (funHist.length > 0 ? `${funHist.length}_${Date.now()}` : Date.now().toString());
+            ffRatings.push({
+                id,
+                fact: pick,
+                author: uname,
+                at: Date.now(),
+                ratings: []
+            });
+            if (ffRatings.length > 50) ffRatings = ffRatings.slice(-50);
+            await saveJSONFile("funfacts_ratings.json", ffRatings);
+        } catch {}
         return;
     }
+
 
     // --- SLASH: MEME ---
     if (interaction.isChatInputCommand() && interaction.commandName === "meme") {
@@ -1618,6 +1659,42 @@ return;
 
     // --- SLASH: FUNFACTS (recent posts leaderboard) ---
     if (interaction.isChatInputCommand() && interaction.commandName === 'funfacts') {
+        // Show rating leaderboard, then recent facts
+        let ffRatings = [];
+        try { ffRatings = await readJSONFile("funfacts_ratings.json", []); } catch {}
+        let leaderboardText = "";
+        if (ffRatings.length > 0) {
+            // Compute leaderboard by author (average rating, min 3 ratings)
+            let stats = {};
+            for (const ff of ffRatings) {
+                if (!stats[ff.author]) stats[ff.author] = { total:0, count:0, facts:0 };
+                let avg = ff.ratings?.length
+                    ? ff.ratings.reduce((s, r) => s + r.value, 0) / ff.ratings.length
+                    : 0;
+                if (ff.ratings?.length >= 3) {
+                    stats[ff.author].total += avg;
+                    stats[ff.author].count++;
+                }
+                stats[ff.author].facts++;
+            }
+            let authors = Object.keys(stats)
+                .filter(name => stats[name].count > 0)
+                .map(name => ({
+                    name,
+                    facts: stats[name].facts,
+                    avg: (stats[name].total / stats[name].count).toFixed(2),
+                    count: stats[name].count
+                }))
+                .sort((a, b) => b.avg - a.avg)
+                .slice(0, 3);
+            if (authors.length) {
+                leaderboardText += `🌟 **Fun Fact Rating Leaders**:`;
+                for (const [idx, a] of authors.entries()) {
+                    leaderboardText += `\n${idx+1}. ${a.name} (Avg Rating: ${a.avg}, from ${a.count} rated facts, total facts: ${a.facts})`;
+                }
+                leaderboardText += "\n";
+            }
+        }
         // Show last 6 facts from /data/fun_facts_history.json
         let funHist = [];
         try { funHist = await readJSONFile("fun_facts_history.json", []); } catch {}
@@ -1628,12 +1705,13 @@ return;
         const factsToShow = funHist.slice(-6).reverse();
         let embed = new EmbedBuilder()
             .setTitle("🎉 Recent Fun Facts")
-            .setDescription(
+            .setDescription([
+                leaderboardText,
                 factsToShow.map((f, i) =>
                     `**[${i+1}]** ${f.fact}\n*— ${f.user} (<t:${Math.floor(f.at/1000)}:R>)*`
                 ).join("\n\n")
-            )
-            .setFooter({text: "Want to share more? Use /funfact!" })
+            ].join("\n"))
+            .setFooter({text: "Want to share more? Use /funfact! Rate facts 1–5 with the buttons!"})
             .setColor(0xfde68a);
         await interaction.reply({
             embeds: [embed],
@@ -1641,6 +1719,7 @@ return;
         });
         return;
     }
+
 
 
 
@@ -3129,6 +3208,22 @@ return;
         const notesCount = await db.get('SELECT COUNT(*) as n FROM notes');
         const warns = await db.get('SELECT COUNT(*) as n FROM warnings');
         const users = await db.get('SELECT COUNT(DISTINCT userId) as n FROM xp');
+        // Additional: Most rated fun fact
+        let ffRatings = [];
+        try { ffRatings = await readJSONFile("funfacts_ratings.json", []); } catch {}
+        let bestFF = "";
+        if (ffRatings.length) {
+            let top = ffRatings
+                .filter(r=>r.ratings && r.ratings.length >= 3)
+                .map(r=>({
+                    ...r,
+                    avg: r.ratings.reduce((a,b)=>a+b.value,0)/r.ratings.length
+                }))
+                .sort((a, b) => b.avg - a.avg)[0];
+            if (top) {
+                bestFF = `Best fun fact (by rating): "${top.fact}" (${top.author}, avg ${(top.avg||0).toFixed(2)})`;
+            }
+        }
         const embed = new EmbedBuilder()
           .setTitle("Bot statistics")
           .addFields(
@@ -3139,10 +3234,57 @@ return;
             { name: "Active users", value: ""+users.n, inline: true }
           )
           .setColor(0x2e89ff);
+        if (bestFF) embed.addFields({ name: "🏆", value: bestFF });
         await interaction.reply({embeds:[embed], ephemeral:false});
         return;
     }
+
+    // --- FUNFACT RATING BUTTON HANDLER (new feature) ---
+    if (interaction.isButton() && /^funfact_rate_\d$/.test(interaction.customId)) {
+        // Find the last fun fact in funfacts_ratings.json with this fact and add the user's rating (no duplicate per user/fact)
+        let ratingNumber = parseInt(interaction.customId.split("_")[2]);
+        if (isNaN(ratingNumber) || ratingNumber < 1 || ratingNumber > 5) {
+            await interaction.reply({ content: "Invalid rating.", allowedMentions: { parse: [] } });
+            return;
+        }
+        try {
+            let ffRatings = await readJSONFile("funfacts_ratings.json", []);
+            // Try to find the last rating entry in the past 2min (to avoid accidental mixing batches)
+            const now = Date.now();
+            let idx = ffRatings.findIndex(
+                f => (now - f.at < 2*60*1000)
+                    && f.fact
+                    && (interaction.message?.embeds?.[0]?.description?.includes(f.fact))
+            );
+            if (idx === -1) {
+                // Fallback: try match fact string exactly from embed
+                let factText = interaction.message?.embeds?.[0]?.description?.replace(/"/g,"").trim() || "";
+                idx = ffRatings.findIndex(f => f.fact === factText);
+            }
+            if (idx === -1) {
+                await interaction.reply({ content: "Could not match this fact for rating!", allowedMentions: { parse: [] } });
+                return;
+            }
+            if (ffRatings[idx].ratings.find(r => r.userId === interaction.user.id)) {
+                await interaction.reply({ content: "You already rated this fun fact!", allowedMentions: { parse: [] } });
+                return;
+            }
+            ffRatings[idx].ratings.push({ userId: interaction.user.id, value: ratingNumber, at: now });
+            await saveJSONFile("funfacts_ratings.json", ffRatings);
+            // UX: compute new avg for this fact and thank
+            const avg = ((ffRatings[idx].ratings.reduce((a,b)=>a+b.value,0))/ffRatings[idx].ratings.length).toFixed(2);
+            await interaction.reply({
+                content: `Thank you for your rating! This fact's average is now ${avg} (${ffRatings[idx].ratings.length} ratings).`,
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({ content: "Failed to save rating. Please try again.", allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
 });
+
 
 
 
