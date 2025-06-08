@@ -4898,7 +4898,53 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    // --- ADDITIONAL FEATURE: CLEARMESSAGES (MODERATION TOOL) ---
+    if (interaction.isChatInputCommand && interaction.commandName === "clearmessages") {
+        // Admin tool: delete all messages from a specific user in the main channel, log to audit trail
+        const targetUser = interaction.options.getUser("target_user");
+        if (!targetUser) {
+            await interaction.reply({ content: "You must select a user.", allowedMentions: { parse: [] } });
+            return;
+        }
+        try {
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            let messages = await chan.messages.fetch({ limit: 100 });
+            let toDelete = messages.filter(m => m.author.id === targetUser.id && !m.author.bot);
+            let delCount = 0;
+            for (let m of toDelete.values()) {
+                try {
+                    await m.delete();
+                    // Also log as deleted in message_logs for transparency/mod log
+                    await db.run("UPDATE message_logs SET deleted=1 WHERE messageId=?", m.id);
+                    delCount++;
+                } catch {}
+            }
+            await interaction.reply({
+                content: `🧹 Attempted to delete ${delCount} messages from user ${targetUser.username} in this channel (check audit logs for details).`,
+                allowedMentions: { parse: [] }
+            });
+            // Optionally record audit event in /data/mod_audit.log
+            try {
+                let log = [];
+                try { log = await readJSONFile("mod_audit.json", []); } catch {}
+                log.push({
+                    action: "clearmessages",
+                    admin: interaction.user.username,
+                    targetUser: targetUser.username,
+                    count: delCount,
+                    at: Date.now()
+                });
+                if (log.length > 200) log = log.slice(-200);
+                await saveJSONFile("mod_audit.json", log);
+            } catch {}
+        } catch {
+            await interaction.reply({ content: "Failed to delete messages for that user. Check ID and permissions, and try again.", allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
 });
+
 
 /**
  * Migration: add "handled" column to suggestion if missing (for deployments with pre-existing data)
