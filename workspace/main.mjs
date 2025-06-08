@@ -104,110 +104,6 @@ try {
         } catch {}
     }
 
-
-
-
-
-
-
-
-
-    // --- BUTTON HANDLER: GUESSGAME "SUBMIT GUESS" ---
-    if (interaction.isButton && interaction.isButton() && interaction.customId === "guessgame_guess_btn") {
-        // Open a modal for user input
-        const modal = new ModalBuilder()
-            .setCustomId('guessgame_guess_modal')
-            .setTitle('Submit Your Guess!')
-            .addComponents(
-                new ActionRowBuilder().addComponents(
-                    new TextInputBuilder()
-                        .setCustomId('guess_value')
-                        .setLabel('Your Guess (1-100)')
-                        .setStyle(TextInputStyle.Short)
-                        .setRequired(true)
-                        .setPlaceholder('Enter a number from 1 to 100')
-                )
-            );
-        await interaction.showModal(modal);
-        return;
-    }
-
-    // --- MODAL HANDLER: GUESSGAME_GUESS_MODAL ---
-    if (interaction.isModalSubmit && interaction.isModalSubmit() && interaction.customId === "guessgame_guess_modal") {
-        // Get game state
-        if (!client._activeGuessGame || !client._activeGuessGame[CHANNEL_ID] || !client._activeGuessGame[CHANNEL_ID].active) {
-            await interaction.reply({ content: "There is no active guess game right now!", allowedMentions: { parse: [] } });
-            return;
-        }
-        // Process guess
-        const rawGuess = interaction.fields.getTextInputValue('guess_value');
-        let guess = Number(rawGuess);
-        if (isNaN(guess) || guess < 1 || guess > 100) {
-            await interaction.reply({ content: "Please enter a number between 1 and 100.", allowedMentions: { parse: [] } });
-            return;
-        }
-        let game = client._activeGuessGame[CHANNEL_ID];
-        // Prevent duplicate guess from same user in a row
-        const prevGuess = game.guesses[game.guesses.length-1];
-        if (prevGuess && prevGuess.userId === interaction.user.id && prevGuess.guess === guess) {
-            await interaction.reply({ content: "You just guessed that number. Try a different guess!", allowedMentions: { parse: [] } })
-            return;
-        }
-        game.guesses.push({ userId: interaction.user.id, guess, ts: Date.now() });
-        let uname = interaction.user.username;
-        if (guess === game.answer) {
-            game.active = false;
-            // Announce winner publicly
-            const chan = await client.channels.fetch(CHANNEL_ID);
-            await chan.send({ content: `🎉 ${uname} guessed the correct number **${game.answer}**!`, allowedMentions: { parse: [] } });
-            // Save leaderboard data for future /guessleaderboard (bonus)
-            let lb = [];
-            try { lb = await readJSONFile("guessgame_leaderboard.json", []); } catch {}
-            let idx = lb.findIndex(x=>x.userId===interaction.user.id);
-            if (idx<0) lb.push({userId:interaction.user.id, wins:1});
-            else lb[idx].wins++;
-            await saveJSONFile("guessgame_leaderboard.json", lb);
-            await interaction.reply({ content: `You got it! The answer was **${game.answer}**.`, allowedMentions: { parse: [] } });
-        } else {
-            let diff = Math.abs(guess - game.answer);
-            let hint = "";
-            if (diff <= 2) hint = "🔥 Almost there!";
-            else if (guess < game.answer) hint = "Try higher ⬆️";
-            else if (guess > game.answer) hint = "Try lower ⬇️";
-            await interaction.reply({ content: `Incorrect! ${hint}`, allowedMentions: { parse: [] } });
-        }
-        return;
-    }
-
-    // --- SLASH: GUESSLEADERBOARD ---
-    if (interaction.isChatInputCommand && interaction.commandName === "guessleaderboard") {
-        let lb = [];
-        try { lb = await readJSONFile("guessgame_leaderboard.json", []); } catch {}
-        if (!lb.length) {
-            await interaction.reply({ content: "No one has won the guessing game yet! Use `/playguessgame` to start.", allowedMentions: { parse: [] } });
-            return;
-        }
-        // Sort by wins
-        lb = lb.sort((a, b) => b.wins - a.wins);
-        // Get usernames
-        let desc = [];
-        for (let i = 0; i < Math.min(5, lb.length); ++i) {
-            let it = lb[i];
-            let uname = it.userId;
-            try {
-                let u = await client.users.fetch(it.userId);
-                uname = u.username;
-            } catch {}
-            desc.push(`#${i + 1}: ${uname} — ${it.wins} win${it.wins === 1 ? "" : "s"}`);
-        }
-        const embed = new EmbedBuilder()
-            .setTitle("Number Guessing Game Leaderboard")
-            .setDescription(desc.join('\n'))
-            .setColor(0x89d2dc);
-        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
-        return;
-    }
-
 } catch {}
 
 
@@ -1173,6 +1069,101 @@ const eightBallResponses = [
  * Also: fix interaction.channel.type undefined bug for system/app_home/other types. DMs are type === 1 or interaction.channel is null (DM), text/guild channels differ.
  */
 client.on('interactionCreate', async interaction => {
+    // --- BUTTON HANDLER: GUESSGAME "SUBMIT GUESS" ---
+    if (interaction.isButton && interaction.isButton() && interaction.customId === "guessgame_guess_btn") {
+        // Open a modal for user input
+        const modal = new ModalBuilder()
+            .setCustomId('guessgame_guess_modal')
+            .setTitle('Submit Your Guess!')
+            .addComponents(
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('guess_value')
+                        .setLabel('Your Guess (1-100)')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(true)
+                        .setPlaceholder('Enter a number from 1 to 100')
+                )
+            );
+        await interaction.showModal(modal);
+        return;
+    }
+
+    // --- MODAL HANDLER: GUESSGAME_GUESS_MODAL ---
+    if (interaction.isModalSubmit && interaction.isModalSubmit() && interaction.customId === "guessgame_guess_modal") {
+        // Get game state
+        if (!client._activeGuessGame || !client._activeGuessGame[CHANNEL_ID] || !client._activeGuessGame[CHANNEL_ID].active) {
+            await interaction.reply({ content: "There is no active guess game right now!", allowedMentions: { parse: [] } });
+            return;
+        }
+        // Process guess
+        const rawGuess = interaction.fields.getTextInputValue('guess_value');
+        let guess = Number(rawGuess);
+        if (isNaN(guess) || guess < 1 || guess > 100) {
+            await interaction.reply({ content: "Please enter a number between 1 and 100.", allowedMentions: { parse: [] } });
+            return;
+        }
+        let game = client._activeGuessGame[CHANNEL_ID];
+        // Prevent duplicate guess from same user in a row
+        const prevGuess = game.guesses[game.guesses.length-1];
+        if (prevGuess && prevGuess.userId === interaction.user.id && prevGuess.guess === guess) {
+            await interaction.reply({ content: "You just guessed that number. Try a different guess!", allowedMentions: { parse: [] } })
+            return;
+        }
+        game.guesses.push({ userId: interaction.user.id, guess, ts: Date.now() });
+        let uname = interaction.user.username;
+        if (guess === game.answer) {
+            game.active = false;
+            // Announce winner publicly
+            const chan = await client.channels.fetch(CHANNEL_ID);
+            await chan.send({ content: `🎉 ${uname} guessed the correct number **${game.answer}**!`, allowedMentions: { parse: [] } });
+            // Save leaderboard data for future /guessleaderboard (bonus)
+            let lb = [];
+            try { lb = await readJSONFile("guessgame_leaderboard.json", []); } catch {}
+            let idx = lb.findIndex(x=>x.userId===interaction.user.id);
+            if (idx<0) lb.push({userId:interaction.user.id, wins:1});
+            else lb[idx].wins++;
+            await saveJSONFile("guessgame_leaderboard.json", lb);
+            await interaction.reply({ content: `You got it! The answer was **${game.answer}**.`, allowedMentions: { parse: [] } });
+        } else {
+            let diff = Math.abs(guess - game.answer);
+            let hint = "";
+            if (diff <= 2) hint = "🔥 Almost there!";
+            else if (guess < game.answer) hint = "Try higher ⬆️";
+            else if (guess > game.answer) hint = "Try lower ⬇️";
+            await interaction.reply({ content: `Incorrect! ${hint}`, allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
+    // --- SLASH: GUESSLEADERBOARD ---
+    if (interaction.isChatInputCommand && interaction.commandName === "guessleaderboard") {
+        let lb = [];
+        try { lb = await readJSONFile("guessgame_leaderboard.json", []); } catch {}
+        if (!lb.length) {
+            await interaction.reply({ content: "No one has won the guessing game yet! Use `/playguessgame` to start.", allowedMentions: { parse: [] } });
+            return;
+        }
+        // Sort by wins
+        lb = lb.sort((a, b) => b.wins - a.wins);
+        // Get usernames
+        let desc = [];
+        for (let i = 0; i < Math.min(5, lb.length); ++i) {
+            let it = lb[i];
+            let uname = it.userId;
+            try {
+                let u = await client.users.fetch(it.userId);
+                uname = u.username;
+            } catch {}
+            desc.push(`#${i + 1}: ${uname} — ${it.wins} win${it.wins === 1 ? "" : "s"}`);
+        }
+        const embed = new EmbedBuilder()
+            .setTitle("Number Guessing Game Leaderboard")
+            .setDescription(desc.join('\n'))
+            .setColor(0x89d2dc);
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
     
     // --- ADDITIONAL FEATURE: /randomuser: Pick a random user who has participated recently ---
     if (interaction.isChatInputCommand && interaction.commandName === 'randomuser') {
