@@ -456,6 +456,11 @@ const contextCommands = [
             name: 'randomuser',
             description: 'Pick a random user from recent participants (fun/randomizer)!'
         },
+        // --- NEW FEATURE: ACTIVEUSERS ---
+        {
+            name: 'activeusers',
+            description: 'Show users who have been active in the last 24 hours.'
+        },
 
     // --- ADDITIONAL FEATURE: REPORT from context menu (register missing) ---
     {
@@ -516,6 +521,8 @@ const contextCommands = [
             { name: "color", type: 3, description: "Hex color (e.g. #fbb034)", required: false }
         ]
     },
+
+
 
 
 
@@ -1312,6 +1319,48 @@ client.on('interactionCreate', async interaction => {
         client._pendingReportContextUser = null;
         return;
     }
+
+    // --- SLASH: ACTIVEUSERS (show users active in last 24h) ---
+    if (interaction.isChatInputCommand && interaction.commandName === "activeusers") {
+        try {
+            // Find all userIds who sent a message in last 24h from message_logs
+            const since = Date.now() - 24 * 60 * 60 * 1000;
+            let rows = await db.all(
+                "SELECT DISTINCT userId FROM message_logs WHERE createdAt > ? ORDER BY userId ASC",
+                since
+            );
+            if (!rows || !rows.length) {
+                await interaction.reply({ content: "No users active in the past 24 hours.", allowedMentions: { parse: [] } });
+                return;
+            }
+            // Fetch user info for up to 30 users
+            const shownRows = rows.slice(0, 30);
+            let users = [];
+            for (let r of shownRows) {
+                let uname;
+                try {
+                    let user = await client.users.fetch(r.userId);
+                    uname = user.username;
+                } catch { uname = r.userId; }
+                users.push(uname);
+            }
+            let reply = `Active in the past 24 hours:\n- ` + users.join('\n- ');
+            if (rows.length > 30) reply += `\n...and ${rows.length - 30} more.`
+            await interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("👥 Active Users (past 24h)")
+                        .setDescription(reply)
+                        .setColor(0x32cd32)
+                ],
+                allowedMentions: { parse: [] }
+            });
+        } catch (e) {
+            await interaction.reply({ content: "Failed to fetch active users.", allowedMentions: { parse: [] } });
+        }
+        return;
+    }
+
 
 
     // --- GG COMMAND HANDLERS ---
