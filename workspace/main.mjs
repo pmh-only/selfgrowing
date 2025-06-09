@@ -352,6 +352,8 @@ const client = new Client({
     allowedMentions: { parse: [] } // disables all mentions at client construction/Layer
 });
 
+client.login(TOKEN)
+
 
 /*
 New UX/features added in this SEARCH/REPLACE update:
