@@ -980,18 +980,20 @@ const contextCommands = [
 ];
 
 
+client.on('ready', () => {
+    const rest = new REST({version: '10'}).setToken(TOKEN);
+    try {
+        await rest.put(
+            Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID),
+            {body: [...commands, ...contextCommands]}
+        );
+    } catch (err) {
+        console.error("Failed to register slash commands!", err && err.stack ? err.stack : err);
+    }
+})
 
 
 
-const rest = new REST({version: '10'}).setToken(TOKEN);
-try {
-    await rest.put(
-        Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID),
-        {body: [...commands, ...contextCommands]}
-    );
-} catch (err) {
-    console.error("Failed to register slash commands!", err && err.stack ? err.stack : err);
-}
 
 
 
