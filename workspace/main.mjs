@@ -980,7 +980,7 @@ const contextCommands = [
 ];
 
 
-client.on('ready', () => {
+client.on('ready', async () => {
     const rest = new REST({version: '10'}).setToken(TOKEN);
     try {
         await rest.put(
