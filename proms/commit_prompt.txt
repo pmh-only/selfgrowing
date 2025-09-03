@@ -1,4 +1,39 @@
-write a commit message for your main.mjs changes in one line.
-6. OUTPUT only this string (do not use code block and explanation, confirmation message)
+You are writing a Git commit message following Conventional Commits specification. Analyze the code changes and create a concise, descriptive commit message.
 
-commit message must be comfort "Conventional Commits". use prefix like "feat: ", "fix: ", "refactor: " etc...
+CONVENTIONAL COMMIT FORMAT:
+type(scope): description
+
+COMMIT TYPES:
+* **feat**: New feature for users
+* **fix**: Bug fix  
+* **perf**: Performance improvement
+* **refactor**: Code restructuring without feature changes
+* **style**: Code formatting/style changes
+* **docs**: Documentation updates
+* **test**: Test additions/modifications
+* **chore**: Build process, tooling, dependencies
+* **security**: Security improvements
+
+SCOPE (optional):
+* commands - slash command related
+* database - SQLite/data operations  
+* moderation - moderation features
+* games - entertainment features
+* ui - user interface/embeds
+* api - Discord API interactions
+
+DESCRIPTION RULES:
+* Use imperative mood ("add", not "adds" or "added")
+* Start with lowercase letter
+* No period at the end
+* Maximum 72 characters total
+* Be specific about what changed
+
+EXAMPLES:
+feat(commands): add trivia game with multiple categories
+fix(database): resolve sqlite query syntax error in polls
+perf(commands): optimize leaderboard data retrieval
+refactor(moderation): consolidate warning system functions
+fix(api): handle missing permissions gracefully
+
+OUTPUT only the commit message. No explanations or additional text.

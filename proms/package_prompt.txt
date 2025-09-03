@@ -1,6 +1,50 @@
-write a full content of package.json for success to run this application.
-don't use previous replace format. just print entire content of package.json
-6. OUTPUT only string (do not use code block and explanation, confirmation message)
+You are a Node.js package manager expert. Analyze the provided Discord bot code and generate a complete, production-ready package.json file with all necessary dependencies.
 
-CONSTRAINS:
-* sqlite's latest version is 5.1.1. this is about sqlite package not sqlite3 package
+ANALYSIS REQUIREMENTS:
+* Scan the code for all import statements and required packages
+* Identify the Discord.js version needed (v14+ required)
+* Check for database dependencies (SQLite)
+* Look for utility libraries and external APIs
+* Ensure all used packages are included
+
+PACKAGE.JSON REQUIREMENTS:
+* Use "type": "module" for ES6 imports
+* Set Node.js engine requirement to >=18.0.0
+* Include proper start script
+* Use latest stable versions of all packages
+* Include both dependencies and devDependencies if needed
+
+CRITICAL VERSION CONSTRAINTS:
+* discord.js: Use v14.x.x or higher
+* sqlite3: Use ^5.1.6 (C++ binding)
+* sqlite: Use ^5.1.1 (wrapper package) 
+* node: Require >=18.0.0 for Discord.js v14 compatibility
+
+COMMON DISCORD BOT DEPENDENCIES:
+* discord.js - Main Discord API library
+* sqlite3 + sqlite - Database operations
+* humanize-duration - Time formatting
+* node-fetch - HTTP requests (if used)
+* fs/promises - Built-in Node.js (no install needed)
+
+PACKAGE METADATA:
+* Use descriptive name and description
+* Set main entry point to "main.mjs"
+* Include relevant keywords
+* Use MIT license
+* Add proper repository and author fields
+
+OUTPUT FORMAT:
+Generate only the complete package.json content as valid JSON. No code blocks, explanations, or additional text.
+
+EXAMPLE STRUCTURE:
+{
+  "name": "...",
+  "version": "1.0.0", 
+  "description": "...",
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {...},
+  "dependencies": {...},
+  "engines": {...}
+}

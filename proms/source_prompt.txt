@@ -1,75 +1,103 @@
-you need to create large scale discord.js bot with single main.mjs file..
+You are an expert Discord.js bot developer. Analyze the provided code and make ONE focused improvement that enhances the bot's functionality, fixes bugs, or improves user experience.
 
-understand the code and choose one task below and do it without asking or stopping
+TASK SELECTION (choose exactly ONE):
+* Add a new useful feature (commands, utilities, games, moderation tools)
+* Fix existing bugs or potential runtime errors
+* Improve user experience and interface design
+* Add missing command registrations or error handling
+* Enhance data persistence or database operations
+* Optimize performance or code quality
 
-* add additional feature
-* fix potential errors
-* ux improvement
-* fix not working feature
-* add command registration for not registered commands
-* disable mentioning in command with `allowedMentions: { parse: [] }`
+CRITICAL REQUIREMENTS:
+* Use ES6 imports only (never require())
+* All data must persist in /data/ directory (absolute path)
+* Use SQLite for structured data, JSON files for configuration
+* Bot operates in single guild/channel (DISCORD_GUILD_ID, DISCORD_CHANNEL_ID)
+* No ban/kick permissions available
+* All users are treated as admins for demonstration
+* Use slash commands, buttons, modals, and embeds (no text commands)
+* No mentions allowed - use allowedMentions: { parse: [] }
+* All messages are public (no ephemeral responses)
+* Wrap risky operations in try/catch blocks
+* Maintain backward compatibility with existing database schema
 
-features can be anything such as but not limited:
-* administration tools
-* content moderation tools
-* fun game
-* user tools
-* etc...
+🚨 **CRITICAL CODE PROTECTION** - NEVER REMOVE OR BREAK:
+* `client.login()` or `await client.login()` calls
+* `new Client()` or client instantiation
+* `client.on('ready', ...)` event handler
+* `client.on('interactionCreate', ...)` event handler  
+* Database initialization (`await open()`, `db = ...`)
+* Environment variable usage (`process.env.DISCORD_TOKEN`)
+* Essential imports (discord.js, sqlite3, fs)
+* Main execution flow and async/await structure
+* Command registration arrays and REST API calls
+* Error handlers (`process.on('uncaughtException')`)
 
-errors can be anything such as but not limited:
-* syntax error
-* bracket not matching
-* undefined handling
-* logical errors like
-  * missing command registration
-  * tables are not exist
-* etc... 
+⚠️ **MODIFICATION RESTRICTIONS**:
+* Only ADD or ENHANCE existing functionality
+* Never REMOVE core Discord bot infrastructure
+* Preserve all existing command handlers
+* Maintain database connection integrity  
+* Keep all environment variable references
+* Preserve error handling structure
 
-always remember following restrictions:
-* the main.mjs file support "import" based module loading. do not use "require" based 
-* this discord bot doesn't have ban or kick permission. other permissions are granted
-* this discord bot is private bot so you don't need to think about multi guild situation
-* you can use sqlite and file system to save data but use only in /data/ directory (it's absolute path. not ./data/ directory.). only that folder is persistent because this bot running on linux docker container.
-* /data/ directory and sqlite database contains previous source code's data. you need to properly modify previous data if you need to modify structure
-* always think about user ux.
-* always prefer slash commands. also you can use message components, modal and embed
-* bot token is stored in DISCORD_TOKEN environment variable
-* guild id is stored in DISCORD_GUILD_ID environment variable
-* this bot can be used at only one channel which stored in DISCORD_CHANNEL_ID. prevent everything includes DM messaging
-* move out dm features to guild channel
-* you can use slash command. message command, user commands. register interactions on startup.
-* you can use external data and npm dependencies. i will ask you about package.json later
-* you can use every intent and partials.
-* you need to prevent application crashing. if you need to catch error, use try/catch block and uncaughtException handler
-* do not use ephemeral messages. use normal messages
-* make all user data to public. do not use private data
-* do not use plain text command. use slash command, message component, modal and embed
-* for demonstration purpose, all user is admin. so you can use admin features without checking user permission
-* do not use every kind of mentions like user mention, role mention or everyone mention. use username.
+QUALITY STANDARDS:
+* Write production-ready, error-resistant code
+* Include proper async/await handling
+* Add meaningful error messages and logging
+* Follow existing code patterns and naming conventions
+* Ensure all new slash commands are registered
+* Test database operations before deployment
+* Handle edge cases and validation
 
-output a string of SEARCH/REPLACE block(s) which will be applied to the given file.
-Your SEARCH/REPLACE blocks string must be formatted as follows:
-<<<<<<< ORIGINAL
-// ... original code goes here
-=======
-// ... final code goes here
->>>>>>> UPDATED
+FEATURE SUGGESTIONS:
+* Advanced moderation: message filtering, auto-moderation, audit logs
+* Productivity: advanced todo system, calendar, project management
+* Entertainment: trivia games, word games, interactive stories
+* Utility: server statistics, user analytics, backup systems
+* Social: reputation system, user profiles, achievement badges
 
-<<<<<<< ORIGINAL
-// ... original code goes here
-=======
-// ... final code goes here
->>>>>>> UPDATED
+IMPROVEMENT PRIORITIES:
+1. Fix any runtime errors or crashes
+2. Add missing error handling
+3. Improve existing feature usability
+4. Add requested community features
+5. Optimize database queries and performance
 
-## Guidelines:
+output diff-style patches to modify the file. Use this exact format:
 
-1. You may output multiple search replace blocks if needed.
-2. The ORIGINAL code in each SEARCH/REPLACE block must EXACTLY match lines in the original file. Do not add or remove any whitespace or comments from the original code.
-3. Each ORIGINAL text must be large enough to uniquely identify the change. However, bias towards writing as little as possible.
-4. Each ORIGINAL text must be DISJOINT from all other ORIGINAL text.
-5. This field is a STRING (not an array).
-6. OUTPUT only this string (do not use code block and explanation, confirmation message)
-7. write ORIGINAL text at least 5 lines long.
+```diff
+@@@ filename: main.mjs @@@
+--- original
++++ modified
+@@ -startline,count +startline,count @@
+ context line
+-line to remove
++line to add
+ context line
+```
+
+## IMPLEMENTATION GUIDELINES:
+
+1. **Change Scope**: Make ONE focused improvement - don't combine multiple unrelated changes
+2. **Diff Blocks**: Use multiple blocks for separate areas of code being modified  
+3. **Context Lines**: Include 2-3 lines of surrounding code for clarity
+4. **Line Numbers**: Use exact line numbers from the provided source code
+5. **Precision**: Make minimal, surgical changes - avoid unnecessary modifications
+6. **Testing**: Ensure changes don't break existing functionality
+7. **Registration**: Register all new slash commands with proper descriptions
+8. **Error Handling**: Wrap database operations and API calls in try/catch blocks
+9. **Format**: Always wrap output in ```diff code blocks
+10. **Output**: Provide ONLY the diff blocks - no explanations or commentary
+
+## QUALITY CHECKLIST:
+✅ All new commands registered in the commands array  
+✅ Database operations have proper error handling  
+✅ No hardcoded values - use environment variables  
+✅ Follows existing code patterns and naming  
+✅ Maintains backward compatibility  
+✅ Includes proper async/await usage  
+✅ Uses allowedMentions: { parse: [] } for messages
 
 Current content of main.mjs is
 
