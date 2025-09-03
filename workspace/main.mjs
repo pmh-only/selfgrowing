@@ -5476,14 +5476,31 @@ client.once('ready', async () => {
 
 });
 
+// Fix: sqlite does not support ORDER BY/LIMIT directly in UPDATE reliably across versions.
+// Instead, SELECT the relevant row id first (the most recent matching log) then update by id.
+// This prevents SQL errors and ensures the correct record is marked deleted when a message is removed.
 client.on('messageDelete', async msg => {
     // Log which message was deleted for use with /snipe
     if (!msg.partial && msg.guild && msg.channel && msg.channel.id === CHANNEL_ID && !msg.author?.bot) {
-        // Also try to record more info for snipe jump link, in case possible
-        await db.run("UPDATE message_logs SET deleted=1, messageId=?, channelId=?, guildId=? WHERE userId=? AND content=? AND deleted=0 ORDER BY createdAt DESC LIMIT 1",
-            msg.id, msg.channel.id, msg.guild.id, msg.author.id, msg.content);
+        try {
+            // Find the most recent matching message_logs entry for this user/content that is not yet marked deleted
+            const row = await db.get(
+                "SELECT id FROM message_logs WHERE userId=? AND content=? AND deleted=0 ORDER BY createdAt DESC LIMIT 1",
+                msg.author.id, msg.content
+            );
+            if (row && row.id) {
+                await db.run(
+                    "UPDATE message_logs SET deleted=1, messageId=?, channelId=?, guildId=? WHERE id=?",
+                    msg.id, msg.channel.id, msg.guild.id, row.id
+                );
+            }
+        } catch (e) {
+            // Don't crash on logging failures; just warn
+            console.warn("Failed to update message_logs on delete:", e && e.stack ? e.stack : e);
+        }
     }
 });
+
 
 let userWelcomeStatus = {};
 
