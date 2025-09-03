@@ -5264,12 +5264,15 @@ client.on('interactionCreate', async interaction => {
 
 
 // --- SLASH: REPORTS (view all public reports) ---
+// Wrapped in an interactionCreate listener to avoid "interaction is not defined" errors
+client.on('interactionCreate', async interaction => {
+    if (!(typeof interaction === 'object') ) return;
     if (interaction.isChatInputCommand && interaction.commandName === "reports") {
         // Anyone can view recent public reports; add delete button per report (up to 5 for moderation transparency)
         let reports = [];
         try { reports = await readJSONFile("reports.json", []); } catch {}
         if (!reports.length) {
-            await interaction.reply({ content: "No message reports yet!", allowedMentions: { parse: [] } });
+            try { await interaction.reply({ content: "No message reports yet!", allowedMentions: { parse: [] } }); } catch {}
             return;
         }
         // List last 10, newest first; allow delete by # via buttons for up to 5
@@ -5288,9 +5291,13 @@ client.on('interactionCreate', async interaction => {
                 new ButtonBuilder().setCustomId('delete_report_num_' + r.displayIndex).setLabel(`Delete #${r.displayIndex}`).setStyle(ButtonStyle.Danger)
             )
         );
-        await interaction.reply({ embeds: [embed], components: repRows.length ? [actionRow] : [], allowedMentions: { parse: [] } });
+        try {
+            await interaction.reply({ embeds: [embed], components: repRows.length ? [actionRow] : [], allowedMentions: { parse: [] } });
+        } catch {}
         return;
     }
+});
+
 
 
 
