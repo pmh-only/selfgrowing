@@ -11,11 +11,15 @@ const GUILD_ID = process.env.DISCORD_GUILD_ID;
 const CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
 const DATA_DIR = "/data/";
 
+// Global REST client for registering commands and runtime checks
+const REST_CLIENT = new REST({ version: '10' }).setToken(TOKEN);
+
 // Ensure data dir
 async function ensureDataDir() {
-    try { await fs.stat(DATA_DIR); } 
+    try { await fs.stat(DATA_DIR); }
     catch { await fs.mkdir(DATA_DIR, { recursive: true }) }
 }
+
 
 // ------- Helper: End poll and show results ---------
 async function finishPoll(pollRec, chan) {
@@ -999,16 +1003,16 @@ const contextCommands = [
 
 
 client.on('ready', async () => {
-    const rest = new REST({version: '10'}).setToken(TOKEN);
     try {
-        await rest.put(
+        await REST_CLIENT.put(
             Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID),
-            {body: [...commands, ...contextCommands]}
+            { body: [...commands, ...contextCommands] }
         );
     } catch (err) {
         console.error("Failed to register slash commands!", err && err.stack ? err.stack : err);
     }
 })
+
 
 
 
@@ -1519,11 +1523,11 @@ client.on('interactionCreate', async interaction => {
         // --- ADDITIONAL FEATURE: REPORT MESSAGES COMMAND (slash) ---
         // Register "report" command if not yet registered.
         try {
-            const commandsList = await rest.get(
+            const commandsList = await REST_CLIENT.get(
                 Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID)
             );
             if (!commandsList.find(cmd => cmd.name === "report")) {
-                await rest.post(
+                await REST_CLIENT.post(
                     Routes.applicationGuildCommands((await client.application?.id) || "0", GUILD_ID),
                     { body: [{
                         name: "report",
@@ -1536,6 +1540,7 @@ client.on('interactionCreate', async interaction => {
                 );
             }
         } catch (e) { }
+
         return;
 
     }
@@ -1849,30 +1854,32 @@ client.on('interactionCreate', async interaction => {
         );
         // Safety: store poll options for fast access so "vote" doesn't fail if options parse bug
         client._activePolls = client._activePolls || {};
+        let cmsg = null;
+        try {
+            cmsg = await interaction.reply({ embeds: [embed], components:[row], fetchReply:true });
+        } catch (e) {
+            await interaction.reply({content: 'Failed to post poll. Please try again.'});
+            return;
+        }
+        // Store active poll in-memory keyed by message id
         client._activePolls[cmsg.id] = { opts, end: Date.now()+dur };
 
-        let cmsg = null;
-try {
-    cmsg = await interaction.reply({ embeds: [embed], components:[row], fetchReply:true });
-} catch (e) {
-    await interaction.reply({content: 'Failed to post poll. Please try again.'});
-    return;
-}
-await db.run(`
-    INSERT INTO poll(title, options, creatorId, channelId, messageId, votes, expiresAt)
-    VALUES (?,?,?,?,?,?,?)
-`, title, JSON.stringify(opts), interaction.user.id, interaction.channel.id, cmsg.id, '{}', Date.now()+dur);
-setTimeout(async ()=>{
-    let p;
-    try { p = await db.get('SELECT * FROM poll WHERE messageId=?', cmsg.id); } catch { p = null; }
-    if (!p) return;
-    // Remove from in-memory _activePolls
-    if (client._activePolls) delete client._activePolls[cmsg.id];
-    try {
-        await finishPoll(p, interaction.channel);
-    } catch {}
-}, dur);
-return;
+        await db.run(`
+            INSERT INTO poll(title, options, creatorId, channelId, messageId, votes, expiresAt)
+            VALUES (?,?,?,?,?,?,?)
+        `, title, JSON.stringify(opts), interaction.user.id, interaction.channel.id, cmsg.id, '{}', Date.now()+dur);
+        setTimeout(async ()=>{
+            let p;
+            try { p = await db.get('SELECT * FROM poll WHERE messageId=?', cmsg.id); } catch { p = null; }
+            if (!p) return;
+            // Remove from in-memory _activePolls
+            if (client._activePolls) delete client._activePolls[cmsg.id];
+            try {
+                await finishPoll(p, interaction.channel);
+            } catch {}
+        }, dur);
+        return;
+
 
 }
 
