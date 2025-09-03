@@ -461,6 +461,15 @@ const contextCommands = [
             name: 'activeusers',
             description: 'Show users who have been active in the last 24 hours.'
         },
+        // --- [ADDITIONAL FEATURE]: ECHO ADMIN COMMAND ---
+        {
+            name: 'echo',
+            description: 'Bot repeats your message as an embed (admin utility, test)',
+            options: [
+                { name: 'text', type: 3, description: 'Message to echo', required: true }
+            ]
+        },
+
 
     // --- ADDITIONAL FEATURE: REPORT from context menu (register missing) ---
     {
@@ -2950,6 +2959,7 @@ return;
     }
 
 
+
     // --- ADDITIONAL FEATURE: PIN MESSAGE IN CHANNEL ---
     if (interaction.isChatInputCommand() && interaction.commandName === "pin") {
         // Only allow in main channel
@@ -4265,9 +4275,27 @@ client.on('messageCreate', async msg => {
 
 
 client.on('interactionCreate', async interaction => {
-    
+    // --- NEW FEATURE: /echo (admin repeat as embed, fun/test)
+    if (interaction.isChatInputCommand && interaction.commandName === "echo") {
+        // Simple echo repeat command, replies as an embed (for admin/test/fun)
+        let text = interaction.options.getString('text', false) || "";
+        if (!text.trim()) {
+            await interaction.reply({ content: "You must provide a message to echo!", allowedMentions: { parse: [] } });
+            return;
+        }
+        let embed = new EmbedBuilder()
+            .setTitle("🔁 Echo")
+            .setDescription(text.substring(0, 2000))
+            .setFooter({ text: `Echoed by ${interaction.user.username}` })
+            .setColor(0xa0aec0);
+        await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+        return;
+    }
+
+
 
 // --- POLL & DICE-GAME BUTTON HANDLERS ---
+
     // --- DICE WAR BUTTONS ---
     if (
         interaction.isButton() &&

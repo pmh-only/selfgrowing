@@ -1,22 +1,29 @@
 {
   "name": "discord-bot-large",
   "version": "1.0.0",
-  "type": "module",
-  "description": "Large scale Discord bot with slash commands, moderation and fun tools.",
+  "description": "Large scale single-file Discord.js bot with many features and sqlite/file persistent storage.",
   "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node main.mjs"
+  },
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.13.0",
     "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1",
-    "humanize-duration": "^3.30.0",
-    "node-fetch": "^3.3.2"
+    "humanize-duration": "^3.29.0",
+    "node-fetch": "^2.6.9"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "scripts": {
-    "start": "node main.mjs"
-  },
-  "author": "",
+  "keywords": [
+    "discord",
+    "bot",
+    "slash-commands",
+    "sqlite",
+    "single-file"
+  ],
+  "author": "YourName",
   "license": "MIT"
 }
