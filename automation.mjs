@@ -21,7 +21,7 @@ const changelog = await discord.channels.fetch(process.env.DISCORD_CHANNEL_ID)
 await changelog.send(new Date() + ' start creating new version')
 
 const source_response = await client.responses.create({
-  model: 'gpt-4.1',
+  model: 'gpt-5-mini',
   input: [{
     role: 'user',
     content: source_prompt
@@ -40,7 +40,9 @@ for (const [original, updated] of changes)
 fs.writeFileSync('./workspace/main.mjs', source)
 
 const package_response = await client.responses.create({
-  model: 'gpt-4.1',
+  model: 'gpt-5-mini',
+  reasoning: { effort: "high" },
+  text: { verbosity: "high" },
   input: [
     {
       role: 'user',
@@ -60,7 +62,9 @@ const package_response = await client.responses.create({
 fs.writeFileSync('./workspace/package.json', package_response.output_text)
 
 const changelog_response = await client.responses.create({
-  model: 'gpt-4.1',
+  model: 'gpt-5-nano',
+  reasoning: { effort: "low" },
+  text: { verbosity: "medium" },
   input: [
     {
       role: 'user',
@@ -93,7 +97,9 @@ await changelog.send({
 })
 
 const commit_response = await client.responses.create({
-  model: 'gpt-4.1',
+  model: 'gpt-5-nano',
+  reasoning: { effort: "low" },
+  text: { verbosity: "low" },
   input: [
     {
       role: 'user',
