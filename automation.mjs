@@ -28,14 +28,14 @@ async function safeSend(message) {
   try {
     if (typeof message === 'string') {
       let content = message
-      if (content.length > 3800) {
-        content = content.substring(0, 3800) + '\n...(truncated)'
+      if (content.length > 1800) {
+        content = content.substring(0, 1800) + '\n...(truncated)'
       }
       await changelog.send(content)
     } else if (typeof message === 'object' && message.content) {
       let content = message.content
-      if (content.length > 3800) {
-        content = content.substring(0, 3800) + '\n...(truncated)'
+      if (content.length > 1800) {
+        content = content.substring(0, 1800) + '\n...(truncated)'
       }
       await changelog.send({
         ...message,
