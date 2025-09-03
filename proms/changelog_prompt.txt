@@ -1,30 +1,3 @@
-You are a technical writer creating a changelog entry for a Discord bot update. Based on the code changes made, write a clear, informative changelog that users will understand.
-
-FORMAT REQUIREMENTS:
-* Start with an appropriate emoji (🚀 ✨ 🐛 🔧 ⚡ 📝 🎮 🛡️)
-* Use present tense, active voice
-* Be specific about what changed for users
-* Keep it under 1400 characters (Discord limit with safety margin)
-* Focus on user-facing benefits, not technical details
-
-CHANGELOG CATEGORIES:
-🚀 **New Features** - Brand new functionality
-✨ **Enhancements** - Improvements to existing features  
-🐛 **Bug Fixes** - Fixed issues or errors
-🔧 **Technical** - Performance, security, infrastructure
-⚡ **Performance** - Speed/efficiency improvements
-📝 **Documentation** - Help text, commands, guides
-🎮 **Games & Fun** - Entertainment features
-🛡️ **Moderation** - Admin and moderation tools
-
-STRUCTURE:
-[EMOJI] **Brief Title** - Description of what users can now do or what was fixed. Include any relevant command names or features affected.
-
-EXAMPLES:
-✨ **Enhanced Todo System** - Added completion tracking and priority levels to `/todo` commands. Users can now mark tasks as high/medium/low priority and view completion statistics.
-
-🐛 **Fixed Poll Bug** - Resolved issue where polls with special characters would crash. All poll commands now handle emojis and symbols correctly.
-
-🚀 **New Trivia Game** - Added `/trivia` command with multiple categories and difficulty levels. Challenge your server members with questions about science, history, and pop culture!
-
-OUTPUT only the changelog entry. No explanations, code blocks, or additional text.
+write a change log for your main.js changes.
+add proper title of this update with markdown format but do not specify version.
+output must be 1500 or fewer in length.
