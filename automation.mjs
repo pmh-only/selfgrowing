@@ -68,7 +68,7 @@ while (response.status === 'queued' || response.status === 'in_progress') {
   response = await client.responses.retrieve(response.id)
 }
 
-await changelog.send(new Date() + ' finished: ' + source_response.output_text.length + ' characters')
+await changelog.send(new Date() + ' finished: ' + response.output_text.length + ' characters')
 await changelog.send(response.output_parsed.changelog)
 
 for (const job of response.output_parsed.modifyJobs) {
