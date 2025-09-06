@@ -1,0 +1,8 @@
+add additional features
+
+features can be anything such as but not limited:
+* administration tools
+* content moderation tools
+* fun game
+* user tools
+* etc...

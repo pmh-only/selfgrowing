@@ -1,3 +1,0 @@
-write a change log for your main.js changes.
-add proper title of this update with markdown format but do not specify version.
-output must be 1500 or fewer in length.

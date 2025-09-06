@@ -1,0 +1,111 @@
+you need to modify this large scale discord.js bot
+
+YOUR TASK IS:
+{{TASK}}
+
+RESTRICTIONS:
+* this discord bot doesn't have some permissions. handle permission errors.
+* this discord bot is private bot so you don't need to think about multi guild situation
+* you can use sqlite and file system to save data but use only in /data/ directory. (it's absolute path. not ./data/ directory)
+  only that folder is persistent because this bot running on linux docker container.
+* /data/ directory and sqlite database contains previous source code's data. you need to properly modify previous data if you need to modify structure
+* always think about user ux.
+* always prefer slash commands. also you can use message components, modal and embed
+* bot token is stored in DISCORD_TOKEN environment variable
+* guild id is stored in DISCORD_GUILD_ID environment variable
+* this bot can be used at only one channel which stored in DISCORD_CHANNEL_ID. prevent everything includes DM messaging
+* move out dm features to guild channel
+* you can use slash command. message command, user commands. register interactions on startup.
+* you can use external data and npm dependencies. but modify package.json also correctly. don't write package-lock file
+* you can use every intent and partials.
+* you need to prevent application crashing. if you need to catch error, use try/catch block and uncaughtException handler
+* do not use ephemeral messages. use normal messages
+* make all user data to public. do not use private data
+* do not use plain text command. use slash command, message component, modal and embed
+* for demonstration purpose, all user is admin. so you can use admin features without checking user permission
+* do not use every kind of mentions like user mention, role mention or everyone mention. use username.
+
+OUTPUT FORMAT:
+* you need to respond in json format
+* for modifyJobs array, you can choose one of three method for each jobs
+  * type: append - write source field for line number and destination field for source code that you want to append in that line (line feed will be prefixed automatically)
+  * type: replace - write source field for original code and destination field for changed code.
+  * type: delete - write source field for line number and destination field will be ignored.
+  * each will be triggered in order
+* for commitMessage field, write a commit message for your code changes in one line. commit message must be comfort "Conventional Commits". use prefix like "feat: ", "fix: ", "refactor: " etc...
+* for changelog field, write a change log for your code changes. add proper title of this update with markdown format but do not specify version. output must be 1500 or fewer in length.
+
+OUTPUT ADVISES:
+* line number for source code will keep changing due to previous modifyJob. always think about it.
+* use "type: replace" for common cases. if you can, write source text at least 5 lines long
+* The original code in each "type: replace"'s source field must exactly match lines in the original file.
+  Do not add or remove any whitespace or comments from the original code
+
+EXAMPLE OUTPUT:
+if your output is this
+```json
+{
+  "modifyJobs": [
+    { "file": "main.js", "type": "append", "source": "2", "destination": "\n// new logger function\nfunction logger (v) {\n  console.log(v)\n}" },
+    { "file": "main.js", "type": "replace", "source": "\n  console.log('a')\n  console.log('b')\n", "destination": "\n  logger('a')\n  logger('b')\n" },
+    { "file": "main.js", "type": "append", "source": "10", "destination": "  logger('c')" },
+    { "file": "main.js", "type": "delete", "source": "9", "destination": "IGNOREME" }
+  ],
+  "commitMessage": "feat: add logger function",
+  "changelog": "# introducing the logger function\nlogger function is the simplified solution for logging situations like some ..."
+}
+```
+
+this original code for main.js:
+```js
+console.log('what')
+function a() {
+  console.log('a')
+  console.log('b')
+}
+a()
+```
+
+will be changed like:
+```js
+console.log('what')
+
+// new logger function
+function logger (v) {
+  console.log(v)
+}
+function a() {
+  logger('a')
+  logger('c')
+}
+a()
+```
+
+this is an example processor for better understanding:
+```js
+let result = source
+
+for (const job of your_output.modifyJobs) {
+  if (job.type === 'append') {
+    result = result.split('\n').slice(0, parseInt(job.source)-1).join('\n') + '\n' + job.destination + '\n' + result.split('\n').slice(parseInt(job.source)-1).join('\n')
+    continue
+  }
+  
+  if (job.type === 'replace') {
+    result = result.replaceAll(job.source, job.destination)
+    continue
+  }
+  
+  if (job.type === 'delete') {
+    result = result.split('\n').filter((v, i) => i !== parseInt(job.source)-1).join('\n')
+    continue
+  }
+}
+
+console.log(result)
+```
+
+Current File contents:
+```json
+{{FILES}}
+```

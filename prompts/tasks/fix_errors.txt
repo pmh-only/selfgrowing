@@ -1,0 +1,10 @@
+fix potential errors or not working features
+
+errors can be anything such as but not limited:
+* syntax error
+* bracket not matching
+* undefined handling
+* logical errors like
+  * missing command registration
+  * tables are not exist
+* etc... 
