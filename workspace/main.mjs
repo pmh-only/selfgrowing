@@ -1002,6 +1002,8 @@ const contextCommands = [
 ];
 
 
+// Register commands and ensure the welcome button row is available before the client fires 'ready'.
+// This avoids a race where the ready handler attempts to use welcomeButtonRow before it's declared.
 client.on('ready', async () => {
     try {
         await REST_CLIENT.put(
@@ -1012,6 +1014,14 @@ client.on('ready', async () => {
         console.error("Failed to register slash commands!", err && err.stack ? err.stack : err);
     }
 })
+// Define welcomeButtonRow early so client.once('ready') can safely reference it regardless of timing.
+const welcomeButtonRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+        .setCustomId('dm_getstarted')
+        .setLabel('Get Started')
+        .setStyle(ButtonStyle.Success)
+);
+
 
 
 
@@ -5502,14 +5512,9 @@ client.on('messageDelete', async msg => {
 });
 
 
+// Track per-user welcome status; welcome button is defined earlier to avoid race conditions.
 let userWelcomeStatus = {};
 
-const welcomeButtonRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-        .setCustomId('dm_getstarted')
-        .setLabel('Get Started')
-        .setStyle(ButtonStyle.Success)
-);
 
 // Safety: ensure error handler always logs full error details (fix: error may be object or string, output .stack if present)
 process.on("uncaughtException", err => {

@@ -1,23 +1,33 @@
 {
-  "name": "large-discord-bot",
+  "name": "large-scale-discord-bot",
   "version": "1.0.0",
-  "description": "A large-scale single-file Discord bot (main.mjs) with many features and sqlite persistence",
-  "main": "main.mjs",
+  "description": "Large-scale single-file Discord bot (ESM) using sqlite and discord.js",
   "type": "module",
-  "private": true,
+  "main": "main.mjs",
   "scripts": {
     "start": "node main.mjs",
-    "dev": "NODE_ENV=development node main.mjs"
+    "dev": "nodemon --watch . --ext mjs,js,json --exec \"node main.mjs\""
   },
   "engines": {
     "node": ">=18"
   },
+  "keywords": [
+    "discord",
+    "discord-bot",
+    "sqlite",
+    "esm",
+    "bot"
+  ],
+  "author": "",
+  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.11.0",
     "sqlite": "5.1.1",
     "sqlite3": "^5.1.6",
-    "node-fetch": "^3.3.2",
+    "node-fetch": "^3.3.1",
     "humanize-duration": "^3.27.0"
   },
-  "license": "MIT"
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
 }
