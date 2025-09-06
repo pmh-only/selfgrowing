@@ -35,9 +35,10 @@ const prompt = promptRaw
   .replace('{{FILES}}', JSON.stringify(sourceFileContents, null, 2))
   .replace('{{TASK}}', taskFileContents[Math.floor(Math.random() * taskFileContents.length)])
 
-const response = await client.responses.parse({
+let response = await client.responses.parse({
   model: 'gpt-5',
   store: true,
+  background: true,
   input: [{
     role: 'user',
     content: prompt
@@ -59,6 +60,13 @@ const response = await client.responses.parse({
     }), "output")
   }
 })
+
+while (response.status === 'queued' || response.status === 'in_progress') {
+  console.log('Current status: ' + response.status)
+
+  await new Promise((resolve) => setTimeout(resolve, 2000))
+  response = await client.responses.retrieve(response.id)
+}
 
 await changelog.send(new Date() + ' finished: ' + source_response.output_text.length + ' characters')
 await changelog.send(response.output_parsed.changelog)
